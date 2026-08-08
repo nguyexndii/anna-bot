@@ -20,14 +20,18 @@ http.createServer((req, res) => {
 });
 
 const { Client, GatewayIntentBits, Events } = require("discord.js");
-const { DISCORD_TOKEN, WORDCHAIN_CHANNEL_ID, RULES_CHANNEL_ID } = require("./src/config/env");
+const { DISCORD_TOKEN, WORDCHAIN_CHANNEL_ID, WORDSCRAMBLE_CHANNEL_ID, RULES_CHANNEL_ID } = require("./src/config/env");
 const { sendWebhook } = require("./src/utils/webhook.service");
+const { connectDatabase } = require("./src/database/mongoose");
+const LeaderboardModel = require("./src/database/models/Leaderboard");
 
 // Word Chain Feature & Word Scramble Feature
 const { onWordChainMessage } = require("./src/features/wordchain/messageHandler");
 const { onWordScrambleMessage } = require("./src/features/wordscramble/messageHandler");
-const { startGame } = require("./src/features/wordchain/game.service");
+const { startGame, getWordChainScoresMap } = require("./src/features/wordchain/game.service");
+const { startScrambleRound, getScrambleState } = require("./src/features/wordscramble/scramble.service");
 const { createDetailedRulesEmbed } = require("./src/features/wordchain/embedBuilder");
+const { createScrambleChallengeEmbed } = require("./src/features/wordscramble/embedBuilder");
 
 if (!DISCORD_TOKEN) {
   console.error("❌ Thiếu DISCORD_TOKEN trong .env");
@@ -44,8 +48,37 @@ const client = new Client({
   ],
 });
 
+/**
+ * Sync MongoDB Atlas data to memory maps on startup
+ */
+async function hydrateMongoData() {
+  try {
+    const docs = await LeaderboardModel.find({});
+    if (docs && docs.length > 0) {
+      const wcMap = getWordChainScoresMap();
+      const scrambleState = getScrambleState();
+      for (const doc of docs) {
+        if (doc.game === "wordchain") {
+          wcMap.set(doc.userId, { id: doc.userId, username: doc.username, wins: doc.wins });
+        } else if (doc.game === "wordscramble") {
+          scrambleState.scores.set(doc.userId, { username: doc.username, wins: doc.wins });
+        }
+      }
+      console.log(`🍃 Đã đồng bộ ${docs.length} bản ghi Bảng xếp hạng từ MongoDB Atlas!`);
+    }
+  } catch (err) {
+    console.error("❌ Lỗi đồng bộ từ MongoDB Atlas:", err.message);
+  }
+}
+
 client.once(Events.ClientReady, async () => {
   console.log(`🔥 Bot đã online: ${client.user.tag}`);
+
+  // Connect to MongoDB Atlas & Sync Data
+  const isDbConnected = await connectDatabase();
+  if (isDbConnected) {
+    await hydrateMongoData();
+  }
 
   // Check and Send Rules Embed to Rules Channel (1450073214620405903) if not already sent
   try {
@@ -84,6 +117,19 @@ client.once(Events.ClientReady, async () => {
     );
   } catch (err) {
     console.error("❌ Error starting Word Chain game:", err);
+  }
+
+  // Start Word Scramble game on startup directly into Word Scramble channel 1535705241620717720
+  try {
+    const scrambleChannel = await client.channels.fetch(WORDSCRAMBLE_CHANNEL_ID).catch(() => null);
+    if (scrambleChannel) {
+      const round = await startScrambleRound();
+      const embed = createScrambleChallengeEmbed(round.scrambledText);
+      await sendWebhook("wordscramble", { embeds: [embed] }, scrambleChannel);
+      console.log(`🧩 Game Sắp Xếp Từ đã được kích hoạt trong kênh (${WORDSCRAMBLE_CHANNEL_ID})! Từ gốc: "${round.originalWord}"`);
+    }
+  } catch (err) {
+    console.error("❌ Error starting Word Scramble game on ready:", err);
   }
 });
 

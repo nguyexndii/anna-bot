@@ -2,8 +2,8 @@
 // Quản lý tập trung toàn bộ Reaction Custom Emoji để tái sử dụng cho tất cả các trò chơi & tính năng sau này
 
 module.exports = {
-  // Tỷ lệ xuất hiện reaction cảm xúc ngẫu nhiên (20%)
-  EMOTION_CHANCE: 0.20,
+  // Tỷ lệ xuất hiện reaction cảm xúc ngẫu nhiên (Giảm xuống 10% để không bị loạn kênh chat)
+  EMOTION_CHANCE: 0.10,
 
   // Reaction Mặc định khi gõ ĐÚNG hoặc SAI
   DEFAULT_REACTIONS: {

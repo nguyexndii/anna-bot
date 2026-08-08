@@ -21,6 +21,7 @@ const {
 } = require("./embedBuilder");
 const { sendWebhook } = require("../../utils/webhook.service");
 const { applySmartMoveReaction, getRandomEmotionEmoji } = require("../../utils/emojiManager");
+const { checkVulgarAndMute } = require("../../utils/moderation");
 const { WORDCHAIN_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
 
 // Target channel ID & Admin check
@@ -120,6 +121,10 @@ function onWordChainMessage(client) {
       return;
     }
 
+    // 2. Check for vulgar/profane language and Mute 3 minutes if detected
+    const isMuted = await checkVulgarAndMute(message);
+    if (isMuted) return;
+
     if (!isGameActive()) return;
 
     const rawContent = message.content.trim().toLowerCase();
@@ -156,7 +161,7 @@ function onWordChainMessage(client) {
       return;
     }
 
-    // 1. Lệnh Gợi ý Hệ thống: !goiy (Giữ nguyên tin nhắn & tag người dùng)
+    // 1. Lệnh Gợi ý Hệ thống: !goiy
     if (
       rawContent === "!goiy" ||
       rawContent === "!gợi ý"
@@ -225,7 +230,7 @@ function onWordChainMessage(client) {
       return;
     }
 
-    // 3. Lệnh Hướng dẫn luật chơi: !luatchoi, !huongdan (Tự động xóa sau 1 phút)
+    // 3. Lệnh Hướng dẫn luật chơi: !luatchoi, !huongdan
     if (
       rawContent === "!luatchoi" ||
       rawContent === "!huongdan" ||
@@ -294,14 +299,14 @@ function onWordChainMessage(client) {
         return;
       }
 
-      // 2. Check duplicate
+      // 2. Check duplicate across entire game session (CẤM LẶP LẠI BẤT KỲ TỪ NÀO ĐÃ DÙNG)
       if (checkDuplicate(normalizedCandidate)) {
         await applySmartMoveReaction(message, false, false);
-        console.log(`❌ [${message.author.tag}] Duplicate: "${candidate}"`);
+        console.log(`❌ [${message.author.tag}] Duplicate word: "${candidate}"`);
         return;
       }
 
-      // 3. Check reversal spam
+      // 3. Check reversal spam (CẤM ĐẢO TỪ)
       if (checkReversal(normalizedCandidate)) {
         await applySmartMoveReaction(message, false, false);
         console.log(`❌ [${message.author.tag}] Reversal spam: "${candidate}"`);
@@ -367,7 +372,7 @@ async function handleWin(message, client, winningWord) {
     const userId = message.author.id;
     const username = message.author.username;
 
-    // React with victory trophy + random cool emotion emoji (strongpepe, tomhehe, kirbyjam94, Anime)
+    // React with victory trophy + random cool emotion emoji
     await applySmartMoveReaction(message, true, false);
     await message.react("🏆").catch(() => {});
     const coolEmoji = getRandomEmotionEmoji("COOL");

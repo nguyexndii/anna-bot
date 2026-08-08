@@ -96,11 +96,11 @@ function createHelpEmbed() {
     .setTitle("📖 HƯỚNG DẪN TRÒ CHƠI NỐI TỪ")
     .setColor("#5865F2")
     .setDescription(
-      "Chào mừng bạn tham gia trò chơi **Nối Từ Tiếng Việt**! Hãy thử thách vốn từ của bạn cùng bạn bè và Hệ thống trọng tài.\n\n" +
+      "Chào mừng đến với trò chơi **Nối Từ Tiếng Việt**! Hãy thử thách với vốn từ của bạn.\n\n" +
       "🔹 **Luật chơi cơ bản:**\n" +
       "✦ Gõ cụm từ **2 tiếng** (Ví dụ: từ hiện tại là `danh dự` ➡️ bạn nối `dự đoán`).\n" +
       "✦ Tiếng đầu tiên của từ bạn gõ phải trùng khớp với tiếng cuối của từ trước đó.\n" +
-      "✦ Nếu sau **1 phút** không ai nối tiếp, **Hệ thống** sẽ tự động tiếp chiêu cùng bạn!\n\n" +
+      "✦ Nếu sau **1 phút** không ai nối tiếp, **Hệ thống** sẽ tự động chơi cùng bạn!\n\n" +
       "⚡ **Danh sách câu lệnh:**\n" +
       "✦ `!goiy` hoặc `!gợi ý`: Nhờ Hệ thống gợi ý cụm từ tiếp theo.\n" +
       "✦ `!bxh` hoặc `!bangxephang`: Xem Bảng xếp hạng cao thủ.\n" +
@@ -111,6 +111,7 @@ function createHelpEmbed() {
 
 /**
  * Create general rules embed for the Entertainment Category Rules Channel (1450073214620405903)
+ * Polite, dignified, structured & clear!
  * @returns {EmbedBuilder}
  */
 function createDetailedRulesEmbed() {
@@ -118,22 +119,21 @@ function createDetailedRulesEmbed() {
     .setTitle("🎮 NỘI QUY & HƯỚNG DẪN KHU GIẢI TRÍ")
     .setColor("#E67E22")
     .setDescription(
-      "Chào mừng tất cả các thành viên đến với **Khu Giải Trí**! Đây là không gian dành cho mọi người thư giãn, giao lưu và thử thách bản thân với các trò chơi hấp dẫn.\n\n" +
+      "Chào mừng đến với **Khu Giải Trí**! Đây là nơi mọi người thư giãn, giao lưu và thử thách bản thân. Xin vui lòng tuân thủ các quy định sau:\n\n" +
       "📌 **1. QUY ĐỊNH CHUNG KHI THAM GIA:**\n" +
-      "✦ Giữ gìn văn hóa ứng xử lịch sự, tôn trọng các thành viên khác trong Server.\n" +
-      "✦ **Nghiêm cấm:** Nói tục, chửi thề, dùng từ ngữ thô tục, cợt nhả nhảm nhí hoặc cố tình spam phá hoại kênh.\n" +
-      "✦ Tham gia chơi game văn minh, vui vẻ và công bằng.\n\n" +
+      "✦ **Ứng xử văn minh:** Tôn trọng lẫn nhau, duy trì không khí giao lưu vui vẻ, lịch sự.\n" +
+      "✦ **Cấm ngôn từ thô tục:** Nghiêm cấm chửi thề, sử dụng từ ngữ thô tục, cố tình phát ngôn nhảm nhí phá rối ván chơi.\n" +
+      "✦ **Chơi game công bằng:** Không sử dụng công cụ gian lận.\n\n" +
       "🎮 **2. CÁC TRÒ CHƠI HIỆN CÓ KHU GIẢI TRÍ:**\n\n" +
-      "🔤 **Trò chơi Nối Từ Tiếng Việt** *(Kênh <#1450065511231520778>)*\n" +
-      "✦ **Cách chơi:** Nối cụm từ **2 tiếng** (Ví dụ: `danh dự` ➡️ `dự đoán`). Tiếng đầu của từ bạn gõ phải trùng với tiếng cuối của từ trước.\n" +
-      "✦ **Đấu Bot 24/7:** Sau **1 phút** nếu không có ai nối tiếp, **Hệ thống Trọng tài** sẽ tự động tiếp chiêu 1 lượt để ván game luôn sôi động.\n" +
-      "✦ **Câu lệnh hữu ích:** `!goiy` (Gợi ý từ - 2p/lần), `!bxh` (Bảng xếp hạng), `!huongdan` (Hướng dẫn nhanh).\n\n" +
-      "🎲 **Các trò chơi tiếp theo:** *(Đang được phát triển và sẽ sớm ra mắt...)*\n\n" +
-      "⚖️ **3. HỆ THỐNG TRỌNG TÀI TỰ ĐỘNG:**\n" +
-      "✦ Mọi lượt chơi đều được **Hệ thống Trọng tài AI** kiểm duyệt tự động.\n" +
-      "✦ Từ hợp lệ sẽ được thả biểu cảm ✅ hoặc ✨, từ sai/thô tục sẽ bị thả icon ⛔ từ chối."
+      "🔤 **1. Trò Chơi Nối Từ Tiếng Việt** *(Kênh <#1450065511231520778>)*\n" +
+      "✦ **Cách chơi:** Nối cụm từ **2 tiếng** (Ví dụ: `bình an` ➡️ `an nhiên`). Tiếng đầu của từ bạn gõ phải trùng với tiếng cuối của từ trước.\n" +
+      "✦ **Đấu Bot 24/7:** Sau **1 phút** nếu không có người chơi nối tiếp, **Hệ thống** sẽ tự động tiếp chiêu 1 lượt để giữ ván game luôn liên tục.\n" +
+      "✦ **Câu lệnh hỗ trợ:** `!goiy` (Xin gợi ý từ), `!bxh` (Bảng xếp hạng), `!huongdan` (Hướng dẫn nhanh).\n\n" +
+      "🧩 **2. Trò Chơi Sắp Xếp Từ (Word Unscramble)** *(Kênh <#1535705241620717720>)*\n" +
+      "✦ **Cách chơi:** AI tráo đổi thứ tự các chữ cái của một cụm từ tiếng Việt (Ví dụ: `H / Ạ / N / H / P / H / Ú / C`). Ghép đúng từ gốc để tích lũy **+1 điểm** trên Bảng Xếp Hạng!\n" +
+      "✦ **Câu lệnh hỗ trợ:** `!sapxep` (Đổi câu đố mới), `!goiy` (Gợi ý chữ cái đầu & chủ đề), `!bxh` (Bảng xếp hạng)."
     )
-    .setFooter({ text: "Chúc các bạn có những giây phút giải trí tuyệt vời tại Khu Giải Trí!" });
+    .setFooter({ text: "Chúc các thành viên có những giây phút giải trí tuyệt vời tại Khu Giải Trí!" });
 }
 
 module.exports = {

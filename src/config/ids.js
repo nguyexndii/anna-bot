@@ -10,6 +10,7 @@ module.exports = {
   // ID các Kênh Discord (Channels)
   CHANNELS: {
     WORDCHAIN: process.env.WORDCHAIN_CHANNEL_ID || "1450065511231520778", // Kênh game Nối Từ
+    WORDSCRAMBLE: "1535705241620717720",                                 // Kênh game Sắp Xếp Từ
     RULES: "1450073214620405903",                                        // Kênh Luật chơi / Hướng dẫn
     GENERAL_CHAT: "1389842864594227270",                                 // Kênh chat chung
     IMAGE_UPLOAD: "1389842916725231626",                                 // Kênh gửi ảnh

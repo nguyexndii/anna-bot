@@ -1,13 +1,52 @@
 // src/features/wordchain/game.service.js
+const fs = require("fs");
+const path = require("path");
+const mongoose = require("mongoose");
+const LeaderboardModel = require("../../database/models/Leaderboard");
 const { getEasyStartPhrase } = require("./wordPairs.service");
 const { lastKey, normalize } = require("../../utils/textUtils");
+
+const WORDCHAIN_DATA_FILE = path.join(__dirname, "../../data/leaderboard_wordchain.json");
+
+/**
+ * Load wordchain leaderboard from file
+ */
+function loadWordChainScores() {
+  try {
+    if (fs.existsSync(WORDCHAIN_DATA_FILE)) {
+      const raw = fs.readFileSync(WORDCHAIN_DATA_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      const map = new Map();
+      Object.entries(parsed).forEach(([id, data]) => {
+        map.set(id, data);
+      });
+      return map;
+    }
+  } catch (err) {
+    console.error("❌ Error loading wordchain leaderboard file:", err.message);
+  }
+  return new Map();
+}
+
+/**
+ * Save wordchain leaderboard to file
+ */
+function saveWordChainScores(scoresMap) {
+  try {
+    const dir = path.dirname(WORDCHAIN_DATA_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const obj = Object.fromEntries(scoresMap.entries());
+    fs.writeFileSync(WORDCHAIN_DATA_FILE, JSON.stringify(obj, null, 2), "utf-8");
+  } catch (err) {
+    console.error("❌ Error saving wordchain leaderboard file:", err.message);
+  }
+}
 
 // Game state (in-memory)
 let gameState = null;
 
-// Player scores (in-memory)
-// Map<userId, { id: string, username: string, wins: number }>
-const playerScores = new Map();
+// Player scores (persistent file-backed Map)
+const playerScores = loadWordChainScores();
 
 /**
  * Start or restart the game
@@ -28,44 +67,15 @@ function startGame(userId, username = "Bot") {
     startedAt: new Date(),
     startedBy: userId,
     moveCount: 0,
-    sessionScores: new Map(),
+    sessionScores: new Map(), // Scores for current game session only
   };
 
-  console.log(`🎮 Game started by ${username} with phrase: "${startPhrase}"`);
-  return { ...gameState, usedWords: Array.from(gameState.usedWords) };
+  console.log(`🎮 Game started by ${username} (${userId}). Initial phrase: "${startPhrase}"`);
+  return gameState;
 }
 
 /**
- * Skip current game and start a new phrase (Bỏ cuộc / Đổi từ mới)
- * @param {string} userId 
- * @param {string} username 
- * @returns {{oldWord: string, newWord: string}}
- */
-function skipGame(userId, username = "User") {
-  const oldWord = gameState ? gameState.currentWord : "";
-  const newGame = startGame(userId, username);
-  console.log(`🏳️ Game skipped by ${username}. Old: "${oldWord}", New: "${newGame.currentWord}"`);
-  return {
-    oldWord,
-    newWord: newGame.currentWord,
-  };
-}
-
-/**
- * Get current game state
- * @returns {object|null}
- */
-function getCurrentState() {
-  if (!gameState) return null;
-
-  return {
-    ...gameState,
-    usedWords: Array.from(gameState.usedWords),
-  };
-}
-
-/**
- * Check if game is active
+ * Check if game is currently active
  * @returns {boolean}
  */
 function isGameActive() {
@@ -73,50 +83,42 @@ function isGameActive() {
 }
 
 /**
- * Check if word was already used
- * @param {string} normalized
+ * Get current game state
+ * @returns {object|null}
+ */
+function getCurrentState() {
+  return gameState;
+}
+
+/**
+ * Check if word has been used in current game
+ * @param {string} normalizedWord
  * @returns {boolean}
  */
-function checkDuplicate(normalized) {
+function checkDuplicate(normalizedWord) {
   if (!gameState) return false;
-
-  const isDuplicate = gameState.usedWords.has(normalized);
-
-  if (isDuplicate) {
-    console.log(`❌ Duplicate word: "${normalized}"`);
-  }
-
-  return isDuplicate;
+  return gameState.usedWords.has(normalizedWord);
 }
 
 /**
- * Check if current word pair is a reversal of recent pairs (spam prevention)
- * @param {string} normalized - Current word pair (normalized)
+ * Check if user is spamming reversal (e.g. A-B then B-A repeatedly)
+ * @param {string} normalizedWord
  * @returns {boolean}
  */
-function checkReversal(normalized) {
+function checkReversal(normalizedWord) {
   if (!gameState || !gameState.recentPairs) return false;
-
-  const isReversal = gameState.recentPairs.includes(normalized);
-
-  if (isReversal) {
-    console.log(`❌ Reversal spam detected: "${normalized}"`);
-  }
-
-  return isReversal;
+  return gameState.recentPairs.includes(normalizedWord);
 }
 
 /**
- * Update game state after a valid move
- * @param {string} originalWord - Original word from user
- * @param {string} normalizedWord - Normalized version
- * @param {string} userId - User ID
- * @param {string} username - Username
+ * Update game state with valid move
+ * @param {string} originalWord - Original text (e.g., "dự đoán")
+ * @param {string} normalizedWord - Normalized text (e.g., "du doan")
+ * @param {string} userId - Player's Discord ID
+ * @param {string} username - Player's username
  */
 function updateState(originalWord, normalizedWord, userId, username) {
-  if (!gameState) {
-    throw new Error("Cannot update state: game not active");
-  }
+  if (!gameState) return;
 
   gameState.currentWord = originalWord;
   gameState.normalizedWord = normalizedWord;
@@ -159,88 +161,68 @@ function recordWin(userId, username) {
   player.wins++;
   player.username = username;
 
-  console.log(`🏆 ${username} wins! Total: ${player.wins}`);
+  // 1. Save to local JSON backup
+  saveWordChainScores(playerScores);
+
+  // 2. Save beautifully to MongoDB Atlas Database
+  if (mongoose.connection && mongoose.connection.readyState === 1) {
+    LeaderboardModel.findOneAndUpdate(
+      { game: "wordchain", userId },
+      { $inc: { wins: 1 }, $set: { username } },
+      { upsert: true, new: true }
+    ).catch((err) => console.error("❌ Error updating MongoDB Atlas wordchain leaderboard:", err.message));
+  }
+
+  console.log(`🏆 Win recorded for ${username} (${userId}). Total wins: ${player.wins}`);
   return player.wins;
 }
 
 /**
- * Get session scoreboard (players who participated in current game)
- * @returns {Array<{userId: string, username: string, correctWords: number}>}
- */
-function getSessionScoreboard() {
-  if (!gameState || !gameState.sessionScores) {
-    return [];
-  }
-
-  const scoreboard = Array.from(gameState.sessionScores.entries()).map(
-    ([userId, data]) => ({
-      userId,
-      username: data.username,
-      correctWords: data.correctWords,
-    })
-  );
-
-  scoreboard.sort((a, b) => b.correctWords - a.correctWords);
-  return scoreboard;
-}
-
-/**
- * Get leaderboard
+ * Get overall leaderboard sorted by wins
  * @returns {Array<{id: string, username: string, wins: number}>}
  */
 function getLeaderboard() {
-  const leaderboard = Array.from(playerScores.values()).sort(
-    (a, b) => b.wins - a.wins
-  );
-  return leaderboard;
+  return Array.from(playerScores.values())
+    .sort((a, b) => b.wins - a.wins);
 }
 
 /**
- * Get game statistics
- * @returns {object}
+ * Get session scoreboard sorted by correct words
+ * @returns {Array<{userId: string, username: string, correctWords: number}>}
  */
-function getGameStats() {
-  if (!gameState) {
-    return {
-      active: false,
-    };
-  }
+function getSessionScoreboard() {
+  if (!gameState || !gameState.sessionScores) return [];
 
-  const duration = Date.now() - gameState.startedAt.getTime();
-
-  return {
-    active: true,
-    currentWord: gameState.currentWord,
-    expectedKey: gameState.expectedKey,
-    wordCount: gameState.usedWords.size,
-    moveCount: gameState.moveCount,
-    durationSeconds: Math.floor(duration / 1000),
-    startedBy: gameState.startedBy,
-    startedAt: gameState.startedAt,
-  };
+  return Array.from(gameState.sessionScores.entries())
+    .map(([userId, data]) => ({ userId, ...data }))
+    .sort((a, b) => b.correctWords - a.correctWords);
 }
 
 /**
- * Reset/end the game
+ * Skip current game (create new game with new word)
+ * @param {string} userId
+ * @param {string} username
+ * @returns {object} New game state
  */
-function endGame() {
-  const stats = getGameStats();
-  gameState = null;
-  console.log("🏁 Game ended");
-  return stats;
+function skipGame(userId, username) {
+  console.log(`⏩ Game skipped by ${username} (${userId})`);
+  return startGame(userId, username);
+}
+
+function getWordChainScoresMap() {
+  return playerScores;
 }
 
 module.exports = {
   startGame,
-  skipGame,
-  getCurrentState,
   isGameActive,
+  getCurrentState,
   checkDuplicate,
   checkReversal,
   updateState,
   recordWin,
   getLeaderboard,
   getSessionScoreboard,
-  getGameStats,
-  endGame,
+  skipGame,
+  getWordChainScoresMap,
 };
