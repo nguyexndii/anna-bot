@@ -46,13 +46,13 @@ const client = new Client({
 client.once(Events.ClientReady, async () => {
   console.log(`🔥 Bot đã online: ${client.user.tag}`);
 
-  // Send Help Embed to Rules Channel (1450073214620405903)
+  // Send Help Embed directly to Rules Channel (1450073214620405903)
   try {
     const rulesChannel = await client.channels.fetch(RULES_CHANNEL_ID).catch(() => null);
     if (rulesChannel) {
       const helpEmbed = createHelpEmbed();
-      await sendWebhook("wordchain", { embeds: [helpEmbed] }, rulesChannel);
-      console.log(`📌 Đã gửi Hướng dẫn chơi Nối từ vào Kênh Luật (${RULES_CHANNEL_ID})`);
+      await rulesChannel.send({ embeds: [helpEmbed] });
+      console.log(`📌 Đã gửi Hướng dẫn chơi Nối từ trực tiếp vào Kênh Luật (${RULES_CHANNEL_ID})`);
     }
   } catch (err) {
     console.error("❌ Error sending help embed to rules channel:", err);
