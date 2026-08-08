@@ -20,12 +20,13 @@ http.createServer((req, res) => {
 });
 
 const { Client, GatewayIntentBits, Events } = require("discord.js");
-const { DISCORD_TOKEN, WORDCHAIN_CHANNEL_ID } = require("./src/config/env");
+const { DISCORD_TOKEN, WORDCHAIN_CHANNEL_ID, RULES_CHANNEL_ID } = require("./src/config/env");
 const { sendWebhook } = require("./src/utils/webhook.service");
 
 // Word Chain Feature (Active)
 const { onWordChainMessage } = require("./src/features/wordchain/messageHandler");
 const { startGame } = require("./src/features/wordchain/game.service");
+const { createHelpEmbed } = require("./src/features/wordchain/embedBuilder");
 
 if (!DISCORD_TOKEN) {
   console.error("❌ Thiếu DISCORD_TOKEN trong .env");
@@ -44,6 +45,18 @@ const client = new Client({
 
 client.once(Events.ClientReady, async () => {
   console.log(`🔥 Bot đã online: ${client.user.tag}`);
+
+  // Send Help Embed to Rules Channel (1450073214620405903)
+  try {
+    const rulesChannel = await client.channels.fetch(RULES_CHANNEL_ID).catch(() => null);
+    if (rulesChannel) {
+      const helpEmbed = createHelpEmbed();
+      await sendWebhook("wordchain", { embeds: [helpEmbed] }, rulesChannel);
+      console.log(`📌 Đã gửi Hướng dẫn chơi Nối từ vào Kênh Luật (${RULES_CHANNEL_ID})`);
+    }
+  } catch (err) {
+    console.error("❌ Error sending help embed to rules channel:", err);
+  }
   
   // Start Word Chain game
   try {

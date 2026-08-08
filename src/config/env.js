@@ -21,6 +21,7 @@ module.exports = {
   IMAGE_UPLOAD_CHANNEL_ID: CHANNELS.IMAGE_UPLOAD,
   AI_CHANNELS: CHANNELS.AI_CHAT,
   WORDCHAIN_CHANNEL_ID: CHANNELS.WORDCHAIN,
+  RULES_CHANNEL_ID: CHANNELS.RULES,
 
   // Gemini config (Model: gemini-3.1-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(","),
