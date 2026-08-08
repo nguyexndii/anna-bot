@@ -88,7 +88,7 @@ function createSessionScoreboardEmbed(scoreboard, winner) {
 }
 
 /**
- * Create beautiful guide/help embed
+ * Create beautiful guide/help embed (Quick guide for game channel)
  * @returns {EmbedBuilder}
  */
 function createHelpEmbed() {
@@ -109,9 +109,37 @@ function createHelpEmbed() {
     .setFooter({ text: "⏱️ Hướng dẫn này sẽ tự động xóa sau 1 phút để giữ kênh chat sạch đẹp." });
 }
 
+/**
+ * Create general rules embed for the Entertainment Category Rules Channel (1450073214620405903)
+ * @returns {EmbedBuilder}
+ */
+function createDetailedRulesEmbed() {
+  return new EmbedBuilder()
+    .setTitle("🎮 NỘI QUY & HƯỚNG DẪN KHU GIẢI TRÍ")
+    .setColor("#E67E22")
+    .setDescription(
+      "Chào mừng tất cả các thành viên đến với **Khu Giải Trí**! Đây là không gian dành cho mọi người thư giãn, giao lưu và thử thách bản thân với các trò chơi hấp dẫn.\n\n" +
+      "📌 **1. QUY ĐỊNH CHUNG KHI THAM GIA:**\n" +
+      "✦ Giữ gìn văn hóa ứng xử lịch sự, tôn trọng các thành viên khác trong Server.\n" +
+      "✦ **Nghiêm cấm:** Nói tục, chửi thề, dùng từ ngữ thô tục, cợt nhả nhảm nhí hoặc cố tình spam phá hoại kênh.\n" +
+      "✦ Tham gia chơi game văn minh, vui vẻ và công bằng.\n\n" +
+      "🎮 **2. CÁC TRÒ CHƠI HIỆN CÓ KHU GIẢI TRÍ:**\n\n" +
+      "🔤 **Trò chơi Nối Từ Tiếng Việt** *(Kênh <#1450065511231520778>)*\n" +
+      "✦ **Cách chơi:** Nối cụm từ **2 tiếng** (Ví dụ: `danh dự` ➡️ `dự đoán`). Tiếng đầu của từ bạn gõ phải trùng với tiếng cuối của từ trước.\n" +
+      "✦ **Đấu Bot 24/7:** Sau **1 phút** nếu không có ai nối tiếp, **Hệ thống Trọng tài** sẽ tự động tiếp chiêu 1 lượt để ván game luôn sôi động.\n" +
+      "✦ **Câu lệnh hữu ích:** `!goiy` (Gợi ý từ - 2p/lần), `!bxh` (Bảng xếp hạng), `!huongdan` (Hướng dẫn nhanh).\n\n" +
+      "🎲 **Các trò chơi tiếp theo:** *(Đang được phát triển và sẽ sớm ra mắt...)*\n\n" +
+      "⚖️ **3. HỆ THỐNG TRỌNG TÀI TỰ ĐỘNG:**\n" +
+      "✦ Mọi lượt chơi đều được **Hệ thống Trọng tài AI** kiểm duyệt tự động.\n" +
+      "✦ Từ hợp lệ sẽ được thả biểu cảm ✅ hoặc ✨, từ sai/thô tục sẽ bị thả icon ⛔ từ chối."
+    )
+    .setFooter({ text: "Chúc các bạn có những giây phút giải trí tuyệt vời tại Khu Giải Trí!" });
+}
+
 module.exports = {
   createLeaderboardEmbed,
   createWinEmbed,
   createSessionScoreboardEmbed,
   createHelpEmbed,
+  createDetailedRulesEmbed,
 };

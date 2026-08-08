@@ -20,6 +20,7 @@ const {
   createHelpEmbed,
 } = require("./embedBuilder");
 const { sendWebhook } = require("../../utils/webhook.service");
+const { applySmartMoveReaction, getRandomEmotionEmoji } = require("../../utils/emojiManager");
 const { WORDCHAIN_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
 
 // Target channel ID & Admin check
@@ -114,7 +115,7 @@ function onWordChainMessage(client) {
     if (!message.guild) return;
     if (message.author.bot) return;
 
-    // Strict channel check: Must be in channel 1450065511231520778
+    // Strict channel check: Must be in Game Channel 1450065511231520778
     if (message.channelId !== TARGET_CHANNEL_ID) {
       return;
     }
@@ -238,14 +239,12 @@ function onWordChainMessage(client) {
         message.channel
       );
 
-      // Tự động xóa thông báo hướng dẫn sau 60 giây (1 phút)
       if (sentMsg && typeof sentMsg.delete === "function") {
         setTimeout(() => {
           sentMsg.delete().catch(() => {});
         }, 60000);
       }
 
-      // Xóa tin nhắn lệnh !huongdan của user sau 5 giây để kênh sạch sẽ
       setTimeout(() => {
         message.delete().catch(() => {});
       }, 5000);
@@ -286,9 +285,9 @@ function onWordChainMessage(client) {
 
     // Validation logic
     try {
-      // 1. Check first word match
+      // 1. Check first word match (If mismatched -> super dumb -> bonk!)
       if (normalize(firstWord) !== normalize(expectedWord)) {
-        await reactOnce(message, false);
+        await applySmartMoveReaction(message, false, true);
         console.log(
           `❌ [${message.author.tag}] First word mismatch: "${firstWord}" !== "${expectedWord}"`
         );
@@ -297,14 +296,14 @@ function onWordChainMessage(client) {
 
       // 2. Check duplicate
       if (checkDuplicate(normalizedCandidate)) {
-        await reactOnce(message, false);
+        await applySmartMoveReaction(message, false, false);
         console.log(`❌ [${message.author.tag}] Duplicate: "${candidate}"`);
         return;
       }
 
       // 3. Check reversal spam
       if (checkReversal(normalizedCandidate)) {
-        await reactOnce(message, false);
+        await applySmartMoveReaction(message, false, false);
         console.log(`❌ [${message.author.tag}] Reversal spam: "${candidate}"`);
         return;
       }
@@ -312,18 +311,11 @@ function onWordChainMessage(client) {
       // 4. Check connection (Dictionary + System Fallback)
       const connectResult = await canConnectWithAI(firstWord, secondWord);
       if (!connectResult.connect) {
-        await reactOnce(message, false);
+        await applySmartMoveReaction(message, false, false);
         console.log(
           `❌ [${message.author.tag}] Cannot connect: "${firstWord}" -> "${secondWord}"`
         );
         return;
-      }
-
-      // If verified via System Trọng tài
-      if (connectResult.source === "ai") {
-        try {
-          await message.react("✨");
-        } catch {}
       }
 
       // 5. Check if player wins (no next words available)
@@ -333,8 +325,8 @@ function onWordChainMessage(client) {
         return;
       }
 
-      // 6. Valid move - update state
-      await reactOnce(message, true);
+      // 6. Valid move - update state & apply smart reactions
+      await applySmartMoveReaction(message, true, false);
 
       updateState(
         candidate,
@@ -356,7 +348,7 @@ function onWordChainMessage(client) {
         `✅ [${message.author.tag}] Valid word (${connectResult.source}): "${candidate}"`
       );
 
-      // Schedule Bot turn after 15 seconds if no human moves
+      // Schedule Bot turn after 1 minute if no human moves
       scheduleBotTurn(client, message.channel);
 
     } catch (error) {
@@ -368,18 +360,6 @@ function onWordChainMessage(client) {
 }
 
 /**
- * React to a message once
- */
-async function reactOnce(message, isCorrect) {
-  try {
-    const emoji = isCorrect ? "✅" : "⛔";
-    await message.react(emoji);
-  } catch (error) {
-    console.error(`❌ Error reacting to message ${message.id}:`, error.message);
-  }
-}
-
-/**
  * Handle win scenario
  */
 async function handleWin(message, client, winningWord) {
@@ -387,7 +367,12 @@ async function handleWin(message, client, winningWord) {
     const userId = message.author.id;
     const username = message.author.username;
 
-    await message.react("🏆");
+    // React with victory trophy + random cool emotion emoji (strongpepe, tomhehe, kirbyjam94, Anime)
+    await applySmartMoveReaction(message, true, false);
+    await message.react("🏆").catch(() => {});
+    const coolEmoji = getRandomEmotionEmoji("COOL");
+    await message.react(coolEmoji).catch(() => {});
+
     console.log(`🏆 ${username} wins with: "${winningWord}"`);
 
     recordWin(userId, username);

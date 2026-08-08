@@ -3,11 +3,64 @@ const { GEMINI_API_KEYS, GEMINI_MODEL_URL } = require("../../config/env");
 
 let currentKeyIndex = 0;
 
-function getApiKey() {
+/**
+ * Get next API key in Round-Robin order
+ */
+function getNextApiKey() {
   if (!GEMINI_API_KEYS || GEMINI_API_KEYS.length === 0) return "";
   const key = GEMINI_API_KEYS[currentKeyIndex];
   currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
   return key;
+}
+
+/**
+ * Call Gemini API with Multi-Key Rotation & Automatic Fallback Retry
+ * If Key 1 fails (HTTP 429/403), it automatically retries with Key 2, Key 3...
+ * @param {string} prompt 
+ * @param {number} temperature 
+ * @returns {Promise<object|null>}
+ */
+async function callGeminiApi(prompt, temperature = 0.1) {
+  if (!GEMINI_API_KEYS || GEMINI_API_KEYS.length === 0) {
+    console.error("❌ Không tìm thấy GEMINI_API_KEYS trong .env");
+    return null;
+  }
+
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature,
+      maxOutputTokens: 256,
+      responseMimeType: "application/json",
+    },
+  };
+
+  const totalKeys = GEMINI_API_KEYS.length;
+  for (let attempt = 0; attempt < totalKeys; attempt++) {
+    const apiKey = getNextApiKey();
+    if (!apiKey) continue;
+
+    const url = `${GEMINI_MODEL_URL}${apiKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data;
+      }
+
+      console.warn(`⚠️ Gemini Key [${apiKey.slice(0, 8)}...] trả về HTTP ${response.status}. Đang chuyển Key tiếp theo...`);
+    } catch (err) {
+      console.error(`❌ Lỗi gọi Gemini với Key [${apiKey.slice(0, 8)}...]:`, err.message);
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -17,14 +70,7 @@ function getApiKey() {
  * @returns {Promise<{valid: boolean, explanation: string}>}
  */
 async function verifyWordWithAI(firstWord, secondWord) {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return { valid: false, explanation: "Không có API Key" };
-  }
-
   const phrase = `${firstWord.trim()} ${secondWord.trim()}`;
-  const url = `${GEMINI_MODEL_URL}${apiKey}`;
-
   const prompt = `Bạn là Trọng tài Ngôn ngữ Tiếng Việt nghiêm túc và chuẩn mực cho trò chơi Nối Từ.
 Nhiệm vụ: Thẩm định xem cụm 2 từ "${phrase}" (nối từ "${firstWord}" sang "${secondWord}") có phải là một từ hoặc cụm từ tiếng Việt 2 tiếng thực sự có nghĩa rõ ràng, nghiêm túc và được công nhận trong từ điển hoặc đời sống văn minh hay không.
 
@@ -39,29 +85,9 @@ Bắt buộc trả về đúng định dạng JSON:
   "explanation": "Lý do ngắn gọn 1 câu"
 }`;
 
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.1, // Strict temperature
-      maxOutputTokens: 256,
-      responseMimeType: "application/json",
-    },
-  };
-
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      console.error(`❌ Verification HTTP Error: ${response.status}`);
-      return { valid: false, explanation: "Lỗi kết nối Hệ thống" };
-    }
-
-    const data = await response.json();
-    if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+  const data = await callGeminiApi(prompt, 0.1);
+  if (data && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+    try {
       const resultText = data.candidates[0].content.parts[0].text;
       const parsed = JSON.parse(resultText);
       console.log(`✨ Trọng tài Thẩm định "${phrase}": valid=${parsed.valid} (${parsed.explanation})`);
@@ -69,9 +95,9 @@ Bắt buộc trả về đúng định dạng JSON:
         valid: Boolean(parsed.valid),
         explanation: parsed.explanation || "",
       };
+    } catch (e) {
+      console.error("❌ Lỗi parse JSON từ Gemini:", e.message);
     }
-  } catch (err) {
-    console.error("❌ Lỗi verifyWordWithAI:", err.message);
   }
 
   return { valid: false, explanation: "Hệ thống không thể thẩm định" };
@@ -83,10 +109,6 @@ Bắt buộc trả về đúng định dạng JSON:
  * @returns {Promise<string[]>} List of 3 suggested words
  */
 async function getAIHint(expectedWord) {
-  const apiKey = getApiKey();
-  if (!apiKey) return [];
-
-  const url = `${GEMINI_MODEL_URL}${apiKey}`;
   const prompt = `Trong trò chơi Nối Từ tiếng Việt, từ tiếp theo phải BẮT ĐẦU bằng từ "${expectedWord}".
 Hãy gợi ý 3 cụm từ 2 tiếng tiếng Việt CHUẨN MỰC, RÕ NGHĨA bắt đầu bằng "${expectedWord}".
 Nếu từ "${expectedWord}" là từ vô nghĩa, từ cụt hoặc không thể ghép thành cụm từ có nghĩa, hãy trả về mảng rỗng: {"suggestions": []}
@@ -96,49 +118,33 @@ Bắt buộc trả về đúng định dạng JSON:
   "suggestions": ["từ 1", "từ 2", "từ 3"]
 }`;
 
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 256,
-      responseMimeType: "application/json",
-    },
-  };
+  const data = await callGeminiApi(prompt, 0.2);
+  if (data && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+    try {
+      const text = data.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(text);
+      const rawSuggestions = parsed.suggestions || [];
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        const parsed = JSON.parse(text);
-        const rawSuggestions = parsed.suggestions || [];
-        
-        // Double-check hints to make sure every hint is 100% valid before sending
-        const verifiedSuggestions = [];
-        for (const hint of rawSuggestions) {
-          const secondWord = hint.split(/\s+/).pop() || hint;
-          const check = await verifyWordWithAI(expectedWord, secondWord);
-          if (check.valid) {
-            verifiedSuggestions.push(secondWord);
-          }
+      // Double-check hints to make sure every hint is 100% valid before sending
+      const verifiedSuggestions = [];
+      for (const hint of rawSuggestions) {
+        const secondWord = hint.split(/\s+/).pop() || hint;
+        const check = await verifyWordWithAI(expectedWord, secondWord);
+        if (check.valid) {
+          verifiedSuggestions.push(secondWord);
         }
-        return verifiedSuggestions;
       }
+      return verifiedSuggestions;
+    } catch (e) {
+      console.error("❌ Lỗi parse JSON getAIHint:", e.message);
     }
-  } catch (err) {
-    console.error("❌ Lỗi getAIHint:", err.message);
   }
 
   return [];
 }
 
 module.exports = {
+  callGeminiApi,
   verifyWordWithAI,
   getAIHint,
 };

@@ -23,10 +23,11 @@ const { Client, GatewayIntentBits, Events } = require("discord.js");
 const { DISCORD_TOKEN, WORDCHAIN_CHANNEL_ID, RULES_CHANNEL_ID } = require("./src/config/env");
 const { sendWebhook } = require("./src/utils/webhook.service");
 
-// Word Chain Feature (Active)
+// Word Chain Feature & Word Scramble Feature
 const { onWordChainMessage } = require("./src/features/wordchain/messageHandler");
+const { onWordScrambleMessage } = require("./src/features/wordscramble/messageHandler");
 const { startGame } = require("./src/features/wordchain/game.service");
-const { createHelpEmbed } = require("./src/features/wordchain/embedBuilder");
+const { createDetailedRulesEmbed } = require("./src/features/wordchain/embedBuilder");
 
 if (!DISCORD_TOKEN) {
   console.error("❌ Thiếu DISCORD_TOKEN trong .env");
@@ -46,16 +47,25 @@ const client = new Client({
 client.once(Events.ClientReady, async () => {
   console.log(`🔥 Bot đã online: ${client.user.tag}`);
 
-  // Send Help Embed directly to Rules Channel (1450073214620405903)
+  // Check and Send Rules Embed to Rules Channel (1450073214620405903) if not already sent
   try {
     const rulesChannel = await client.channels.fetch(RULES_CHANNEL_ID).catch(() => null);
     if (rulesChannel) {
-      const helpEmbed = createHelpEmbed();
-      await rulesChannel.send({ embeds: [helpEmbed] });
-      console.log(`📌 Đã gửi Hướng dẫn chơi Nối từ trực tiếp vào Kênh Luật (${RULES_CHANNEL_ID})`);
+      const recentMessages = await rulesChannel.messages.fetch({ limit: 10 }).catch(() => null);
+      const alreadySent = recentMessages && recentMessages.some(msg => 
+        msg.embeds && msg.embeds.some(e => e.title && e.title.includes("KHU GIẢI TRÍ"))
+      );
+
+      if (!alreadySent) {
+        const detailedRulesEmbed = createDetailedRulesEmbed();
+        await rulesChannel.send({ embeds: [detailedRulesEmbed] });
+        console.log(`📌 Đã gửi BẢNG NỘI QUY CHI TIẾT vào Kênh Luật (${RULES_CHANNEL_ID})`);
+      } else {
+        console.log(`ℹ️ Kênh Luật đã có Bảng Nội Quy từ trước, không gửi lặp lại.`);
+      }
     }
   } catch (err) {
-    console.error("❌ Error sending help embed to rules channel:", err);
+    console.error("❌ Error checking/sending help embed to rules channel:", err);
   }
   
   // Start Word Chain game
@@ -81,9 +91,14 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   try {
-    // Feature 5: Word Chain Game (Active)
+    // Feature 5: Word Chain Game
     onWordChainMessage(client)(message).catch((err) => {
       console.error("❌ Error in onWordChainMessage:", err);
+    });
+
+    // Feature 6: Word Scramble Game (Sắp Xếp Từ)
+    onWordScrambleMessage(client)(message).catch((err) => {
+      console.error("❌ Error in onWordScrambleMessage:", err);
     });
   } catch (err) {
     console.error("❌ Error in messageCreate wrapper:", err);
