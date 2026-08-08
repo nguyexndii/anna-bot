@@ -100,7 +100,7 @@ function createHelpEmbed() {
       "🔹 **Luật chơi cơ bản:**\n" +
       "✦ Gõ cụm từ **2 tiếng** (Ví dụ: từ hiện tại là `danh dự` ➡️ bạn nối `dự đoán`).\n" +
       "✦ Tiếng đầu tiên của từ bạn gõ phải trùng khớp với tiếng cuối của từ trước đó.\n" +
-      "✦ Nếu sau **15 giây** không ai nối tiếp, **Hệ thống** sẽ tự động tiếp chiêu cùng bạn!\n\n" +
+      "✦ Nếu sau **1 phút** không ai nối tiếp, **Hệ thống** sẽ tự động tiếp chiêu cùng bạn!\n\n" +
       "⚡ **Danh sách câu lệnh:**\n" +
       "✦ `!goiy` hoặc `!gợi ý`: Nhờ Hệ thống gợi ý cụm từ tiếp theo.\n" +
       "✦ `!bxh` hoặc `!bangxephang`: Xem Bảng xếp hạng cao thủ.\n" +

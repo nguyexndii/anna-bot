@@ -33,11 +33,11 @@ const processingMessages = new Set();
 const hintCooldowns = new Map();
 const HINT_COOLDOWN_MS = 120000; // 2 minutes (120 seconds)
 
-// Bot Auto-turn timer (15 seconds)
+// Bot Auto-turn timer (1 minute / 60 seconds)
 let botTurnTimer = null;
 
 /**
- * Schedule Bot Auto-turn after 15 seconds if no human responds
+ * Schedule Bot Auto-turn after 1 minute if no human responds
  */
 function scheduleBotTurn(client, channel) {
   if (botTurnTimer) {
@@ -53,7 +53,7 @@ function scheduleBotTurn(client, channel) {
       if (!state || !state.expectedKey) return;
 
       const expectedKey = state.expectedKey;
-      console.log(`🤖 Hết 15s không ai trả lời, Hệ thống tự động tìm từ nối tiếp cho "${expectedKey}"...`);
+      console.log(`🤖 Hết 1 phút không ai trả lời, Hệ thống tự động tìm từ nối tiếp cho "${expectedKey}"...`);
 
       let candidateWords = getNextWords(expectedKey);
       if (!candidateWords || candidateWords.length === 0) {
@@ -102,7 +102,7 @@ function scheduleBotTurn(client, channel) {
     } catch (err) {
       console.error("❌ Lỗi trong lượt tự động của Hệ thống:", err);
     }
-  }, 15000); // 15 seconds
+  }, 60000); // 1 minute (60 seconds)
 }
 
 /**

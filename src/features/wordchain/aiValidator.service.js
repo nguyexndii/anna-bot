@@ -78,7 +78,7 @@ Bắt buộc trả về đúng định dạng JSON:
 }
 
 /**
- * Get system hint for next words starting with expectedWord
+ * Get system hint for next words starting with expectedWord (with double verification)
  * @param {string} expectedWord 
  * @returns {Promise<string[]>} List of 3 suggested words
  */
@@ -88,8 +88,10 @@ async function getAIHint(expectedWord) {
 
   const url = `${GEMINI_MODEL_URL}${apiKey}`;
   const prompt = `Trong trò chơi Nối Từ tiếng Việt, từ tiếp theo phải BẮT ĐẦU bằng từ "${expectedWord}".
-Hãy gợi ý 3 cụm từ 2 tiếng tiếng Việt nghiêm túc, có nghĩa rõ ràng bắt đầu bằng "${expectedWord}".
-Trả về định dạng JSON:
+Hãy gợi ý 3 cụm từ 2 tiếng tiếng Việt CHUẨN MỰC, RÕ NGHĨA bắt đầu bằng "${expectedWord}".
+Nếu từ "${expectedWord}" là từ vô nghĩa, từ cụt hoặc không thể ghép thành cụm từ có nghĩa, hãy trả về mảng rỗng: {"suggestions": []}
+
+Bắt buộc trả về đúng định dạng JSON:
 {
   "suggestions": ["từ 1", "từ 2", "từ 3"]
 }`;
@@ -97,7 +99,7 @@ Trả về định dạng JSON:
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
-      temperature: 0.5,
+      temperature: 0.2,
       maxOutputTokens: 256,
       responseMimeType: "application/json",
     },
@@ -115,7 +117,18 @@ Trả về định dạng JSON:
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) {
         const parsed = JSON.parse(text);
-        return parsed.suggestions || [];
+        const rawSuggestions = parsed.suggestions || [];
+        
+        // Double-check hints to make sure every hint is 100% valid before sending
+        const verifiedSuggestions = [];
+        for (const hint of rawSuggestions) {
+          const secondWord = hint.split(/\s+/).pop() || hint;
+          const check = await verifyWordWithAI(expectedWord, secondWord);
+          if (check.valid) {
+            verifiedSuggestions.push(secondWord);
+          }
+        }
+        return verifiedSuggestions;
       }
     }
   } catch (err) {
