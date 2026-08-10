@@ -34,6 +34,7 @@ module.exports = {
   // Webhooks
   WEBHOOK_WORDCHAIN: process.env.WEBHOOK_WORDCHAIN,
   WEBHOOK_WORDSCRAMBLE: process.env.WEBHOOK_WORDSCRAMBLE,
+  WEBHOOK_WUWA_CODES: process.env.WEBHOOK_WUWA_CODES,
   WEBHOOKS: {
     HAPPY: process.env.WEBHOOK_HAPPY,
     PLAYFUL: process.env.WEBHOOK_PLAYFUL,
@@ -41,5 +42,6 @@ module.exports = {
     ANGRY: process.env.WEBHOOK_ANGRY,
     WORDCHAIN: process.env.WEBHOOK_WORDCHAIN,
     WORDSCRAMBLE: process.env.WEBHOOK_WORDSCRAMBLE,
+    WUWA_CODES: process.env.WEBHOOK_WUWA_CODES,
   },
 };

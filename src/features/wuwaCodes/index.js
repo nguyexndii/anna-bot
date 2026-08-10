@@ -1,12 +1,46 @@
 // src/features/wuwaCodes/index.js
+const { WebhookClient } = require("discord.js");
 const { scrapeWuwaCodes } = require("./wuwaScraper");
 const { createWuwaCodeEmbed, createWuwaExpiringSoonEmbed } = require("./embedBuilder");
 const { isExpiringWithin24Hours } = require("./wuwaUtils");
 const WuwaCodeModel = require("../../database/models/WuwaCode");
-const { WUWA_CODES_CHANNEL_ID, WUWA_ROLE_ID } = require("../../config/env");
+const { WUWA_CODES_CHANNEL_ID, WUWA_ROLE_ID, WEBHOOK_WUWA_CODES } = require("../../config/env");
 
 // In-memory fallback set for known codes if MongoDB is not connected
 const knownCodesSet = new Set();
+
+/**
+ * Send notification via Webhook (with fallback to channel.send)
+ * @param {import("discord.js").Client} client
+ * @param {import("discord.js").TextChannel} channel
+ * @param {import("discord.js").EmbedBuilder} embed
+ * @param {string|null} roleMention
+ * @returns {Promise<boolean>}
+ */
+async function sendWuwaNotification(client, channel, embed, roleMention) {
+  if (WEBHOOK_WUWA_CODES) {
+    try {
+      const webhookClient = new WebhookClient({ url: WEBHOOK_WUWA_CODES });
+      await webhookClient.send({
+        content: roleMention || undefined,
+        embeds: [embed],
+      });
+      return true;
+    } catch (whErr) {
+      console.error("⚠️ Lỗi gửi tin nhắn qua Webhook, chuyển sang channel.send():", whErr.message);
+    }
+  }
+
+  if (channel) {
+    await channel.send({
+      content: roleMention || undefined,
+      embeds: [embed],
+    });
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * Check Fandom Wiki + DB for active WuWa codes and notify Discord channel if missing from chat
@@ -140,19 +174,14 @@ async function checkAndNotifyWuwaCodes(client) {
           console.error(`⚠️ Không thể lưu code "${codeStr}" vào MongoDB:`, dbSaveErr.message);
         }
 
-        // Send Embed Notification to Discord Channel
-        if (channel) {
-          try {
-            const embed = await createWuwaCodeEmbed(codeObj);
-            const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
-            await channel.send({
-              content: roleMention || undefined,
-              embeds: [embed],
-            });
-            console.log(`✅ Đã gửi thông báo code "${codeStr}" tới kênh (${WUWA_CODES_CHANNEL_ID}) kèm tag Role (${WUWA_ROLE_ID})!`);
-          } catch (sendErr) {
-            console.error(`❌ Lỗi gửi tin nhắn cho code "${codeStr}":`, sendErr.message);
-          }
+        // Send Notification via Webhook or Channel
+        try {
+          const embed = await createWuwaCodeEmbed(codeObj);
+          const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
+          await sendWuwaNotification(client, channel, embed, roleMention);
+          console.log(`✅ Đã gửi thông báo code "${codeStr}" tới kênh (${WUWA_CODES_CHANNEL_ID}) kèm tag Role (${WUWA_ROLE_ID})!`);
+        } catch (sendErr) {
+          console.error(`❌ Lỗi gửi tin nhắn cho code "${codeStr}":`, sendErr.message);
         }
       } else {
         // Code already present in channel
@@ -181,10 +210,7 @@ async function checkAndNotifyWuwaCodes(client) {
         console.log(`⚠️ [WuWa Code Watcher] PHÁT HIỆN ${expiringCodesToNotify.length} CODE SẮP HẾT HẠN TRONG 24H!`);
         const expireEmbed = await createWuwaExpiringSoonEmbed(expiringCodesToNotify);
         const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
-        await channel.send({
-          content: roleMention ? `🔔 ${roleMention} **NHẮC NHỞ CODE SẮP HẾT HẠN!**` : undefined,
-          embeds: [expireEmbed],
-        });
+        await sendWuwaNotification(client, channel, expireEmbed, roleMention ? `🔔 ${roleMention} **NHẮC NHỞ CODE SẮP HẾT HẠN!**` : null);
       }
     } catch (expireCheckErr) {
       console.error("⚠️ Lỗi kiểm tra code sắp hết hạn:", expireCheckErr.message);
@@ -254,16 +280,11 @@ async function addManualCode(client, codeObj) {
       console.error(`⚠️ Không thể lưu code "${codeStr}" vào DB:`, dbSaveErr.message);
     }
 
-    // Send Embed Notification to test/notification channel
-    if (channel) {
-      const embed = await createWuwaCodeEmbed(codeObj);
-      const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
-      await channel.send({
-        content: roleMention || undefined,
-        embeds: [embed],
-      });
-      console.log(`✅ [Thêm thủ công] Đã thông báo code "${codeStr}" vào kênh (${WUWA_CODES_CHANNEL_ID}) kèm tag Role (${WUWA_ROLE_ID})!`);
-    }
+    // Send Notification via Webhook or Channel
+    const embed = await createWuwaCodeEmbed(codeObj);
+    const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
+    await sendWuwaNotification(client, channel, embed, roleMention);
+    console.log(`✅ [Thêm thủ công] Đã thông báo code "${codeStr}" vào kênh (${WUWA_CODES_CHANNEL_ID}) kèm tag Role (${WUWA_ROLE_ID})!`);
 
     return { success: true };
   } catch (err) {
