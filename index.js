@@ -33,6 +33,13 @@ const { startScrambleRound, getScrambleState } = require("./src/features/wordscr
 const { createDetailedRulesEmbed } = require("./src/features/wordchain/embedBuilder");
 const { createScrambleChallengeEmbed } = require("./src/features/wordscramble/embedBuilder");
 
+// Wuthering Waves Code Auto Watcher & Commands
+const { initWuwaCodeWatcher } = require("./src/features/wuwaCodes");
+const { onWuwaCodeMessage } = require("./src/features/wuwaCodes/commandHandler");
+
+// Master Help Command (!lenh, !cmd, !commands, !help)
+const { onHelpMessage } = require("./src/features/helpCommand");
+
 if (!DISCORD_TOKEN) {
   console.error("❌ Thiếu DISCORD_TOKEN trong .env");
   process.exit(1);
@@ -131,6 +138,13 @@ client.once(Events.ClientReady, async () => {
   } catch (err) {
     console.error("❌ Error starting Word Scramble game on ready:", err);
   }
+
+  // Start Wuthering Waves Code Auto Watcher
+  try {
+    initWuwaCodeWatcher(client);
+  } catch (err) {
+    console.error("❌ Error starting WuWa Code Watcher:", err);
+  }
 });
 
 client.on("messageCreate", async (message) => {
@@ -145,6 +159,16 @@ client.on("messageCreate", async (message) => {
     // Feature 6: Word Scramble Game (Sắp Xếp Từ)
     onWordScrambleMessage(client)(message).catch((err) => {
       console.error("❌ Error in onWordScrambleMessage:", err);
+    });
+
+    // Feature 7: Wuthering Waves Code Commands (!testcode, !checkcode, !themcode, !addcode)
+    onWuwaCodeMessage(client)(message).catch((err) => {
+      console.error("❌ Error in onWuwaCodeMessage:", err);
+    });
+
+    // Feature 8: Master Help Command (!lenh, !cmd, !commands, !help)
+    onHelpMessage(client)(message).catch((err) => {
+      console.error("❌ Error in onHelpMessage:", err);
     });
   } catch (err) {
     console.error("❌ Error in messageCreate wrapper:", err);

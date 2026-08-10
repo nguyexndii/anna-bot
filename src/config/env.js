@@ -1,5 +1,5 @@
 // src/config/env.js
-const { ADMIN_IDS, CHANNELS, ROLES } = require("./ids");
+const { ADMIN_IDS, CHANNELS, ROLES, EMOJIS } = require("./ids");
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const APPLICATION_ID = process.env.APPLICATION_ID;
@@ -23,6 +23,9 @@ module.exports = {
   WORDCHAIN_CHANNEL_ID: CHANNELS.WORDCHAIN,
   WORDSCRAMBLE_CHANNEL_ID: CHANNELS.WORDSCRAMBLE,
   RULES_CHANNEL_ID: CHANNELS.RULES,
+  WUWA_CODES_CHANNEL_ID: CHANNELS.WUWA_CODES,
+  WUWA_ROLE_ID: ROLES.WUWA_ROLE || "1528768731873017896",
+  WUWA_EMOJI_ID: (EMOJIS && EMOJIS.WUWA_ICON) || "1536322393411424286",
 
   // Gemini config (Model: gemini-3.1-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(","),

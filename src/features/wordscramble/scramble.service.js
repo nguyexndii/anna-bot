@@ -42,7 +42,7 @@ function saveScrambleScores(scoresMap) {
   }
 }
 
-// Track used words to prevent repetition in the same playing session
+// Track used words to prevent repetition in playing sessions (up to 500 words)
 const usedScrambleWords = new Set();
 
 // Game State for Word Scramble
@@ -55,15 +55,50 @@ let scrambleState = {
   scores: loadScrambleScores(),
 };
 
-// Rich backup pool of 40+ diverse Vietnamese 2-word phrases
+// Rich backup pool of 100+ diverse Vietnamese 2-word phrases
 const BACKUP_WORDS = [
+  // Cảm xúc & Tâm lý
   "hạnh phúc", "bình an", "yêu thương", "trí tuệ", "thành công",
   "kiên trì", "sáng tạo", "phát triển", "tự do", "dũng cảm",
   "đoàn kết", "trách nhiệm", "khiêm tốn", "trung thực", "nhiệt huyết",
   "khát vọng", "tương lai", "hy vọng", "bảo vệ", "xây dựng",
   "giao lưu", "thưởng thức", "kỷ niệm", "nguy hiểm", "thử thách",
   "chiến thắng", "nỗ lực", "vinh quang", "tự hào", "đam đam",
-  "lý tưởng", "nghệ thuật", "kiến thức", "kinh nghiệm", "kỹ năng"
+  "lý tưởng", "nghệ thuật", "kiến thức", "kinh nghiệm", "kỹ năng",
+  "thân thiện", "lạc quan", "vui vẻ", "hào hứng", "trân trọng",
+  "bình tĩnh", "tự tin", "quyết tâm", "bao dung", "nhân ái",
+  "khiêm nhường", "thành thật", "tình cảm", "gắn kết", "chia sẻ",
+
+  // Thiên nhiên & Vũ trụ
+  "mặt trời", "mặt trăng", "ngôi sao", "vũ trụ", "hành tinh",
+  "bão táp", "nắng sớm", "mưa rào", "hoàng hôn", "bình minh",
+  "dòng sông", "biển cả", "ngọn núi", "rừng xanh", "cánh đồng",
+  "thung lũng", "thác nước", "đám mây", "làn gió", "tuyết trắng",
+  "sương mù", "sấm sét", "cầu vồng", "thủy triều", "san hô",
+  "đảo ngọc", "hang động", "sa mạc", "thảo nguyên", "suối mát",
+
+  // Đời sống & Con người
+  "gia đình", "bạn bè", "thầy cô", "mái trường", "quê hương",
+  "đất nước", "con người", "sức khỏe", "tuổi trẻ", "thanh xuân",
+  "ước mơ", "hoài bão", "nụ cười", "ánh mắt", "kỷ luật",
+  "văn hóa", "truyền thống", "lịch sử", "văn học", "âm nhạc",
+  "hội họa", "nhiếp ảnh", "điện ảnh", "du lịch", "khám phá",
+  "trải nghiệm", "thực tế", "đổi mới", "chiến lược", "kế hoạch",
+
+  // Xã hội & Công nghệ
+  "phát minh", "công nghệ", "nghiên cứu", "kỹ thuật", "khoa học",
+  "giáo dục", "học tập", "tài năng", "sản xuất", "kinh doanh",
+  "đầu tư", "hợp tác", "giao tiếp", "lãnh đạo", "quản lý",
+  "mục tiêu", "thành tựu", "bứt phá", "cơ hội", "tiềm năng",
+  "giá trị", "sứ mệnh", "tầm nhìn", "hiệu quả", "văn minh",
+
+  // Cuộc sống hàng ngày & Vật thể
+  "bức tranh", "cuốn sách", "cây đàn", "bàn học", "chiếc xe",
+  "con đường", "góc phố", "tiệm trà", "bữa cơm", "mái nhà",
+  "khung hình", "trang sách", "giai điệu", "vần thơ", "câu chuyện",
+  "lời ca", "tiếng cười", "kỷ vật", "chiếc lá", "bông hoa",
+  "ngọn nến", "hơi thở", "nhịp đập", "giấc mơ", "ánh sáng",
+  "bóng râm", "bình hoa", "ấm trà", "đồng hồ", "chuyến đi"
 ];
 
 /**
@@ -85,7 +120,11 @@ function scramblePhrase(text) {
  * Generate a random new Vietnamese target phrase using Gemini 3.1 Flash Lite
  */
 async function generateWordWithAI() {
-  const TOPICS = ["Thiên nhiên", "Đời sống", "Tri thức", "Tình cảm", "Cảm xúc", "Ý chí", "Nghệ thuật", "Thể thao", "Xã hội", "Gia đình", "Học tập"];
+  const TOPICS = [
+    "Thiên nhiên", "Đời sống", "Tri thức", "Tình cảm", "Cảm xúc",
+    "Ý chí", "Nghệ thuật", "Thể thao", "Xã hội", "Gia đình", "Học tập",
+    "Khoa học", "Văn hóa", "Vũ trụ", "Công nghệ", "Âm nhạc", "Văn học"
+  ];
   const randomTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
 
   const prompt = `Bạn là Trò chơi Sắp Xếp Từ Tiếng Việt.
@@ -109,7 +148,7 @@ Bắt buộc trả về đúng định dạng JSON:
         const candidateWord = parsed.word.trim().toLowerCase();
         if (!usedScrambleWords.has(candidateWord)) {
           usedScrambleWords.add(candidateWord);
-          if (usedScrambleWords.size > 50) usedScrambleWords.clear();
+          if (usedScrambleWords.size > 500) usedScrambleWords.clear();
 
           return {
             word: candidateWord,
@@ -122,11 +161,12 @@ Bắt buộc trả về đúng định dạng JSON:
     console.error("❌ Lỗi sinh từ Sắp Xếp từ AI:", err.message);
   }
 
-  // Backup fallback
+  // Backup fallback with random selection from unused pool
   const unusedBackups = BACKUP_WORDS.filter(w => !usedScrambleWords.has(w));
   const pool = unusedBackups.length > 0 ? unusedBackups : BACKUP_WORDS;
   const randomWord = pool[Math.floor(Math.random() * pool.length)];
   usedScrambleWords.add(randomWord);
+  if (usedScrambleWords.size > 500) usedScrambleWords.clear();
 
   return {
     word: randomWord,
