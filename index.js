@@ -117,6 +117,16 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ success: true, message: "Đã đăng xuất thành công!" });
 });
 
+// API: Lấy URL Mời Bot vào Server (Scope: bot applications.commands)
+app.get("/api/invite-url", (req, res) => {
+  if (!DISCORD_CLIENT_ID) {
+    return res.status(500).json({ success: false, error: "Chưa cấu hình DISCORD_CLIENT_ID trong .env!" });
+  }
+
+  const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&permissions=8&scope=bot%20applications.commands`;
+  res.json({ success: true, url });
+});
+
 // API: Lấy URL Đăng nhập Discord với CSRF State Protection
 app.get("/api/auth/url", (req, res) => {
   if (!DISCORD_CLIENT_ID) {
