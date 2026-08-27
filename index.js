@@ -32,10 +32,6 @@ const { startScrambleRound, getScrambleState } = require("./src/features/wordscr
 const { createDetailedRulesEmbed } = require("./src/features/wordchain/embedBuilder");
 const { createScrambleChallengeEmbed } = require("./src/features/wordscramble/embedBuilder");
 
-// Wuthering Waves Code Auto Watcher & Commands
-const { initWuwaCodeWatcher } = require("./src/features/wuwaCodes");
-const { onWuwaCodeMessage } = require("./src/features/wuwaCodes/commandHandler");
-
 // Master Help Command (!lenh, !cmd, !commands, !help)
 const { onHelpMessage } = require("./src/features/helpCommand");
 
@@ -80,7 +76,9 @@ async function getGuildConfig(guildId) {
       wordchainAutoPlaySec: 60,
       wordscrambleEnabled: false,
       wordscrambleChannelId: "",
-      wordscrambleRoundSec: 60
+      wordscrambleRoundSec: 60,
+      wuwaEnabled: false,
+      wuwaChannelId: ""
     };
     return fallback;
   }
@@ -211,7 +209,6 @@ app.post("/api/auth/callback", async (req, res) => {
       return g.owner || (permissions & ADMINISTRATOR) === ADMINISTRATOR || (permissions & MANAGE_GUILD) === MANAGE_GUILD;
     }).map((g) => ({ id: g.id, name: g.name, icon: g.icon }));
 
-    // Gate: Chỉ cho phép vào Dashboard nếu là Admin/Owner của ít nhất 1 Server
     if (adminGuilds.length === 0) {
       return res.status(403).json({
         success: false,
@@ -281,8 +278,21 @@ app.put("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
     wordchainAutoPlaySec,
     wordscrambleEnabled,
     wordscrambleChannelId,
-    wordscrambleRoundSec
+    wordscrambleRoundSec,
+    wuwaEnabled,
+    wuwaChannelId
   } = req.body;
+
+  // Validation: Mandatory channel selection before enabling feature
+  if (wordchainEnabled && !wordchainChannelId) {
+    return res.status(400).json({ success: false, error: "Vui lòng chọn Kênh Discord cho Minigame Nối Từ trước khi bật!" });
+  }
+  if (wordscrambleEnabled && !wordscrambleChannelId) {
+    return res.status(400).json({ success: false, error: "Vui lòng chọn Kênh Discord cho Minigame Sắp Xếp Từ trước khi bật!" });
+  }
+  if (wuwaEnabled && !wuwaChannelId) {
+    return res.status(400).json({ success: false, error: "Vui lòng chọn Kênh Discord cho Săn Code Wuthering Waves trước khi bật!" });
+  }
 
   try {
     const updatedDoc = await GuildConfigModel.findOneAndUpdate(
@@ -296,6 +306,8 @@ app.put("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
           wordscrambleEnabled: !!wordscrambleEnabled,
           wordscrambleChannelId: wordscrambleChannelId || "",
           wordscrambleRoundSec: Number(wordscrambleRoundSec) || 60,
+          wuwaEnabled: !!wuwaEnabled,
+          wuwaChannelId: wuwaChannelId || "",
           updatedAt: new Date()
         }
       },
@@ -304,6 +316,22 @@ app.put("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
 
     const configObj = updatedDoc.toObject();
     guildConfigsCache.set(guildId, configObj);
+
+    // Dispatch game start / welcome message to Discord channels if feature turned on
+    if (client && client.isReady()) {
+      if (wordchainEnabled && wordchainChannelId) {
+        const ch = await client.channels.fetch(wordchainChannelId).catch(() => null);
+        if (ch && ch.isTextBased()) {
+          ch.send("🎮 **Minigame Nối Từ Đã Được Kích Hoạt!** Hãy nhập từ tiếp theo để bắt đầu chơi!").catch(() => {});
+        }
+      }
+      if (wordscrambleEnabled && wordscrambleChannelId) {
+        const ch = await client.channels.fetch(wordscrambleChannelId).catch(() => null);
+        if (ch && ch.isTextBased()) {
+          ch.send("🔤 **Minigame Sắp Xếp Từ Đã Được Kích Hoạt!** Hãy sẵn sàng tham gia đố chữ giải trí!").catch(() => {});
+        }
+      }
+    }
 
     res.json({ success: true, config: configObj });
   } catch (err) {
@@ -327,8 +355,9 @@ app.get("/api/stats", async (req, res) => {
 
   const features = guildConfig ? {
     wordchain: guildConfig.wordchainEnabled,
-    wordscramble: guildConfig.wordscrambleEnabled
-  } : { wordchain: false, wordscramble: false };
+    wordscramble: guildConfig.wordscrambleEnabled,
+    wuwaWatcher: guildConfig.wuwaEnabled
+  } : { wordchain: false, wordscramble: false, wuwaWatcher: false };
 
   const statsData = {
     success: true,
@@ -372,7 +401,7 @@ app.get("/api/channels", requireAuth, (req, res) => {
   }
 });
 
-// API: Bật/Tắt tính năng minigame theo từng Guild (Legacy endpoint maintained for compatibility)
+// API: Bật/Tắt tính năng minigame theo từng Guild
 app.post("/api/features/toggle", requireAuth, async (req, res) => {
   const { feature, enabled, guildId } = req.body;
   if (!guildId) {
@@ -384,16 +413,33 @@ app.post("/api/features/toggle", requireAuth, async (req, res) => {
     return res.status(403).json({ success: false, error: "Bạn không có quyền Quản Lý trên Server này!" });
   }
 
-  if (feature !== "wordchain" && feature !== "wordscramble") {
-    return res.status(400).json({ success: false, error: "Tính năng không hợp lệ!" });
+  const config = await getGuildConfig(guildId);
+  if (enabled) {
+    if (feature === "wordchain" && !config.wordchainChannelId) {
+      return res.status(400).json({ success: false, error: "Vui lòng chọn Kênh Discord cho Minigame Nối Từ trước khi bật!" });
+    }
+    if (feature === "wordscramble" && !config.wordscrambleChannelId) {
+      return res.status(400).json({ success: false, error: "Vui lòng chọn Kênh Discord cho Minigame Sắp Xếp Từ trước khi bật!" });
+    }
+    if (feature === "wuwaWatcher" && !config.wuwaChannelId) {
+      return res.status(400).json({ success: false, error: "Vui lòng chọn Kênh Discord cho Săn Code Wuthering Waves trước khi bật!" });
+    }
   }
 
-  const updateField = feature === "wordchain" ? { wordchainEnabled: !!enabled } : { wordscrambleEnabled: !!enabled };
+  const updateMap = {
+    wordchain: { wordchainEnabled: !!enabled },
+    wordscramble: { wordscrambleEnabled: !!enabled },
+    wuwaWatcher: { wuwaEnabled: !!enabled }
+  };
+
+  if (!updateMap[feature]) {
+    return res.status(400).json({ success: false, error: "Tính năng không hợp lệ!" });
+  }
 
   try {
     const updatedDoc = await GuildConfigModel.findOneAndUpdate(
       { guildId },
-      { $set: updateField },
+      { $set: updateMap[feature] },
       { new: true, upsert: true }
     );
 
@@ -404,7 +450,8 @@ app.post("/api/features/toggle", requireAuth, async (req, res) => {
       success: true,
       features: {
         wordchain: configObj.wordchainEnabled,
-        wordscramble: configObj.wordscrambleEnabled
+        wordscramble: configObj.wordscrambleEnabled,
+        wuwaWatcher: configObj.wuwaEnabled
       }
     });
   } catch (err) {
@@ -541,12 +588,6 @@ client.once(Events.ClientReady, async () => {
   } catch (err) {
     console.error("❌ Error checking/sending help embed to rules channel:", err);
   }
-
-  try {
-    initWuwaCodeWatcher(client);
-  } catch (err) {
-    console.error("❌ Error starting WuWa Code Watcher:", err);
-  }
 });
 
 client.on("messageCreate", async (message) => {
@@ -571,7 +612,6 @@ client.on("messageCreate", async (message) => {
         }
       }
     }
-    onWuwaCodeMessage(client)(message).catch((err) => console.error("❌ Error in onWuwaCodeMessage:", err));
     onHelpMessage(client)(message).catch((err) => console.error("❌ Error in onHelpMessage:", err));
   } catch (err) {
     console.error("❌ Error in messageCreate wrapper:", err);
