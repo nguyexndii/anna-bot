@@ -263,6 +263,50 @@ app.get("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
   res.json({ success: true, config });
 });
 
+// Helper: Dispatch Game Start Messages into Discord Channel
+async function dispatchGameStartEvents(config) {
+  if (!client || !client.isReady()) return;
+
+  // WordChain (Nối Từ)
+  if (config.wordchainEnabled && config.wordchainChannelId) {
+    const ch = await client.channels.fetch(config.wordchainChannelId).catch(() => null);
+    if (ch && ch.isTextBased()) {
+      const state = startGame(client.user.id, client.user.username);
+      const embed = new EmbedBuilder()
+        .setTitle("🎮 MINIGAME NỐI TỪ TIẾNG VIỆT - BẮT ĐẦU VÒNG CHƠI!")
+        .setColor(0x5865F2)
+        .setDescription(`Trò chơi Nối Từ đã được kích hoạt cho kênh **#${ch.name}**!\n\nTừ khởi đầu: **${state.currentWord.toUpperCase()}**\nHãy nối tiếp từ bắt đầu bằng chữ: **"${state.expectedKey.toUpperCase()}"**`)
+        .setFooter({ text: "Gõ từ nối tiếp theo 2 tiếng tiếng Việt để tham gia!" })
+        .setTimestamp();
+
+      await ch.send({ embeds: [embed] }).catch(() => {});
+    }
+  }
+
+  // WordScramble (Sắp Xếp Từ)
+  if (config.wordscrambleEnabled && config.wordscrambleChannelId) {
+    const ch = await client.channels.fetch(config.wordscrambleChannelId).catch(() => null);
+    if (ch && ch.isTextBased()) {
+      const round = await startScrambleRound();
+      const embed = createScrambleChallengeEmbed(round.scrambledText, round.hintText);
+      await ch.send({ embeds: [embed] }).catch(() => {});
+    }
+  }
+
+  // WuWa Code Watcher
+  if (config.wuwaEnabled && config.wuwaChannelId) {
+    const ch = await client.channels.fetch(config.wuwaChannelId).catch(() => null);
+    if (ch && ch.isTextBased()) {
+      const embed = new EmbedBuilder()
+        .setTitle("🎁 SẮN CODE WUTHERING WAVES - ĐÃ KÍCH HOẠT")
+        .setColor(0x48CAE4)
+        .setDescription(`Kênh **#${ch.name}** đã được đăng ký nhận thông báo Giftcode Wuthering Waves mới nhất tự động!`)
+        .setTimestamp();
+      await ch.send({ embeds: [embed] }).catch(() => {});
+    }
+  }
+}
+
 // API: Cập Nhật Cấu Hình Chi Tiết Minigame Theo Guild
 app.put("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
   const { guildId } = req.params;
@@ -317,21 +361,8 @@ app.put("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
     const configObj = updatedDoc.toObject();
     guildConfigsCache.set(guildId, configObj);
 
-    // Dispatch game start / welcome message to Discord channels if feature turned on
-    if (client && client.isReady()) {
-      if (wordchainEnabled && wordchainChannelId) {
-        const ch = await client.channels.fetch(wordchainChannelId).catch(() => null);
-        if (ch && ch.isTextBased()) {
-          ch.send("🎮 **Minigame Nối Từ Đã Được Kích Hoạt!** Hãy nhập từ tiếp theo để bắt đầu chơi!").catch(() => {});
-        }
-      }
-      if (wordscrambleEnabled && wordscrambleChannelId) {
-        const ch = await client.channels.fetch(wordscrambleChannelId).catch(() => null);
-        if (ch && ch.isTextBased()) {
-          ch.send("🔤 **Minigame Sắp Xếp Từ Đã Được Kích Hoạt!** Hãy sẵn sàng tham gia đố chữ giải trí!").catch(() => {});
-        }
-      }
-    }
+    // Dispatch game starting word & challenge embeds directly into Discord channel
+    await dispatchGameStartEvents(configObj);
 
     res.json({ success: true, config: configObj });
   } catch (err) {
@@ -445,6 +476,10 @@ app.post("/api/features/toggle", requireAuth, async (req, res) => {
 
     const configObj = updatedDoc.toObject();
     guildConfigsCache.set(guildId, configObj);
+
+    if (enabled) {
+      await dispatchGameStartEvents(configObj);
+    }
 
     res.json({
       success: true,
