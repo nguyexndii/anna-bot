@@ -1,47 +1,38 @@
-// src/config/env.js
-const { ADMIN_IDS, CHANNELS, ROLES, EMOJIS } = require("./ids");
+require("dotenv").config();
 
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const APPLICATION_ID = process.env.APPLICATION_ID;
+// Kênh Staff dùng tạm để gom tất cả thông báo tự động (tránh spam kênh chính khi test local)
+const STAFF_CHANNEL = process.env.STAFF_CHANNEL_ID || "1447095306079698984";
+
+/* =========================================================================
+ * DANH SÁCH KÊNH GỐC (DÙNG ĐỂ KHÔI PHỤC KHI CHẠY CHÍNH THỨC):
+ * - Kênh Nội Quy & Nối Từ Gốc: "1450073214620405903"
+ * - Kênh Sắp Xếp Từ Gốc:       "1535705241620717720"
+ * - Kênh WuWa Code Gốc:        "1447095306079698984"
+ * ========================================================================= */
 
 module.exports = {
-  DISCORD_TOKEN,
-  APPLICATION_ID,
+  DISCORD_TOKEN: process.env.DISCORD_TOKEN,
+  MONGO_URI: process.env.MONGO_URI,
+  STAFF_CHANNEL_ID: STAFF_CHANNEL,
 
-  // Admin & IDs from ids.js
-  ADMIN_IDS,
-  ADMIN_ID: ADMIN_IDS[0], // Main admin ID
+  // Kênh Nối Từ (Hiện đang trỏ về Staff Channel để test. Khi bật lại đổi thành: "1450073214620405903")
+  WORDCHAIN_CHANNEL_ID: process.env.WORDCHAIN_CHANNEL_ID || STAFF_CHANNEL,
 
-  // Role IDs
-  TEMP_ROLE_ID: ROLES.TEMP_ROLE,
-  PERMANENT_ROLE_ID: ROLES.PERMANENT_ROLE,
+  // Kênh Sắp Xếp Từ (Hiện đang trỏ về Staff Channel để test. Khi bật lại đổi thành: "1535705241620717720")
+  WORDSCRAMBLE_CHANNEL_ID: process.env.WORDSCRAMBLE_CHANNEL_ID || STAFF_CHANNEL,
 
-  // Channel IDs
-  GENERAL_CHAT_CHANNEL_ID: CHANNELS.GENERAL_CHAT,
-  IMAGE_UPLOAD_CHANNEL_ID: CHANNELS.IMAGE_UPLOAD,
-  AI_CHANNELS: CHANNELS.AI_CHAT,
-  WORDCHAIN_CHANNEL_ID: CHANNELS.WORDCHAIN,
-  WORDSCRAMBLE_CHANNEL_ID: CHANNELS.WORDSCRAMBLE,
-  RULES_CHANNEL_ID: CHANNELS.RULES,
-  WUWA_CODES_CHANNEL_ID: CHANNELS.WUWA_CODES,
-  WUWA_ROLE_ID: ROLES.WUWA_ROLE || "1528768731873017896",
-  WUWA_EMOJI_ID: (EMOJIS && EMOJIS.WUWA_ICON) || "1536322393411424286",
+  // Kênh Nội Quy (Hiện đang trỏ về Staff Channel để test. Khi bật lại đổi thành: "1450073214620405903")
+  RULES_CHANNEL_ID: process.env.RULES_CHANNEL_ID || STAFF_CHANNEL,
 
-  // Gemini config (Model: gemini-3.1-flash-lite)
-  GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(","),
-  GEMINI_MODEL_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=",
+  // Kênh Săn Code Wuthering Waves (Mặc định trỏ về Staff Channel)
+  WUWA_CODES_CHANNEL_ID: process.env.WUWA_CODES_CHANNEL_ID || STAFF_CHANNEL,
+  WUWA_ROLE_ID: process.env.WUWA_ROLE_ID || null,
 
-  // Webhooks
-  WEBHOOK_WORDCHAIN: process.env.WEBHOOK_WORDCHAIN,
-  WEBHOOK_WORDSCRAMBLE: process.env.WEBHOOK_WORDSCRAMBLE,
-  WEBHOOK_WUWA_CODES: process.env.WEBHOOK_WUWA_CODES,
-  WEBHOOKS: {
-    HAPPY: process.env.WEBHOOK_HAPPY,
-    PLAYFUL: process.env.WEBHOOK_PLAYFUL,
-    THINKING: process.env.WEBHOOK_THINKING,
-    ANGRY: process.env.WEBHOOK_ANGRY,
-    WORDCHAIN: process.env.WEBHOOK_WORDCHAIN,
-    WORDSCRAMBLE: process.env.WEBHOOK_WORDSCRAMBLE,
-    WUWA_CODES: process.env.WEBHOOK_WUWA_CODES,
-  },
+  WEBHOOK_WORDCHAIN_ID: process.env.WEBHOOK_WORDCHAIN_ID,
+  WEBHOOK_WORDCHAIN_TOKEN: process.env.WEBHOOK_WORDCHAIN_TOKEN,
+  WEBHOOK_WORDSCRAMBLE_ID: process.env.WEBHOOK_WORDSCRAMBLE_ID,
+  WEBHOOK_WORDSCRAMBLE_TOKEN: process.env.WEBHOOK_WORDSCRAMBLE_TOKEN,
+  DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+  DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+  DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI || "http://localhost:5173/"
 };
