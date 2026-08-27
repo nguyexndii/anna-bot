@@ -22,6 +22,7 @@ const {
 const { sendWebhook } = require("./src/utils/webhook.service");
 const { connectDatabase } = require("./src/database/mongoose");
 const LeaderboardModel = require("./src/database/models/Leaderboard");
+const GuildConfigModel = require("./src/database/models/GuildConfig");
 
 // Word Chain Feature & Word Scramble Feature
 const { onWordChainMessage } = require("./src/features/wordchain/messageHandler");
@@ -53,21 +54,41 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Per-Guild Feature Map: { [guildId]: { wordchain: false, wordscramble: false } }
-const featureStatesMap = new Map();
+// Cache Map for GuildConfig: Map<guildId, ConfigObject>
+const guildConfigsCache = new Map();
 
-function getGuildFeatures(guildId) {
-  if (!guildId) return { wordchain: false, wordscramble: false };
-  if (!featureStatesMap.has(guildId)) {
-    featureStatesMap.set(guildId, { wordchain: false, wordscramble: false });
+async function getGuildConfig(guildId) {
+  if (!guildId) return null;
+  if (guildConfigsCache.has(guildId)) {
+    return guildConfigsCache.get(guildId);
   }
-  return featureStatesMap.get(guildId);
+  try {
+    let configDoc = await GuildConfigModel.findOne({ guildId });
+    if (!configDoc) {
+      configDoc = await GuildConfigModel.create({ guildId });
+    }
+    const configObj = configDoc.toObject();
+    guildConfigsCache.set(guildId, configObj);
+    return configObj;
+  } catch (err) {
+    console.error("❌ Error fetching GuildConfig for:", guildId, err.message);
+    const fallback = {
+      guildId,
+      wordchainEnabled: false,
+      wordchainChannelId: "",
+      wordchainHintCooldownMs: 120000,
+      wordchainAutoPlaySec: 60,
+      wordscrambleEnabled: false,
+      wordscrambleChannelId: "",
+      wordscrambleRoundSec: 60
+    };
+    return fallback;
+  }
 }
 
 // In-Memory CSRF State Store for Discord OAuth2: Map<state, expirationTimestamp>
 const oauthStateStore = new Map();
 
-// Cleanup expired OAuth states every 15 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [st, exp] of oauthStateStore.entries()) {
@@ -233,8 +254,65 @@ app.post("/api/auth/callback", async (req, res) => {
   }
 });
 
+// API: Lấy Cấu Hình Chi Tiết Minigame Theo Guild
+app.get("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
+  const { guildId } = req.params;
+  const isAdminOfGuild = req.user.adminGuilds.some((g) => g.id === guildId);
+  if (!isAdminOfGuild) {
+    return res.status(403).json({ success: false, error: "Bạn không có quyền quản trị Server này!" });
+  }
+
+  const config = await getGuildConfig(guildId);
+  res.json({ success: true, config });
+});
+
+// API: Cập Nhật Cấu Hình Chi Tiết Minigame Theo Guild
+app.put("/api/guilds/:guildId/config", requireAuth, async (req, res) => {
+  const { guildId } = req.params;
+  const isAdminOfGuild = req.user.adminGuilds.some((g) => g.id === guildId);
+  if (!isAdminOfGuild) {
+    return res.status(403).json({ success: false, error: "Bạn không có quyền quản trị Server này!" });
+  }
+
+  const {
+    wordchainEnabled,
+    wordchainChannelId,
+    wordchainHintCooldownMs,
+    wordchainAutoPlaySec,
+    wordscrambleEnabled,
+    wordscrambleChannelId,
+    wordscrambleRoundSec
+  } = req.body;
+
+  try {
+    const updatedDoc = await GuildConfigModel.findOneAndUpdate(
+      { guildId },
+      {
+        $set: {
+          wordchainEnabled: !!wordchainEnabled,
+          wordchainChannelId: wordchainChannelId || "",
+          wordchainHintCooldownMs: Number(wordchainHintCooldownMs) || 120000,
+          wordchainAutoPlaySec: Number(wordchainAutoPlaySec) || 60,
+          wordscrambleEnabled: !!wordscrambleEnabled,
+          wordscrambleChannelId: wordscrambleChannelId || "",
+          wordscrambleRoundSec: Number(wordscrambleRoundSec) || 60,
+          updatedAt: new Date()
+        }
+      },
+      { new: true, upsert: true }
+    );
+
+    const configObj = updatedDoc.toObject();
+    guildConfigsCache.set(guildId, configObj);
+
+    res.json({ success: true, config: configObj });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // API: Stats Thực Tế (Phân quyền Owner-Only cho guildsCount & Per-Guild Features)
-app.get("/api/stats", (req, res) => {
+app.get("/api/stats", async (req, res) => {
   let user = null;
   const token = req.cookies.anna_session || req.headers.authorization?.replace("Bearer ", "");
   if (token) {
@@ -245,7 +323,12 @@ app.get("/api/stats", (req, res) => {
 
   const isOwner = user && user.userId === OWNER_DISCORD_ID;
   const selectedGuildId = req.query.guildId;
-  const features = getGuildFeatures(selectedGuildId);
+  const guildConfig = selectedGuildId ? await getGuildConfig(selectedGuildId) : null;
+
+  const features = guildConfig ? {
+    wordchain: guildConfig.wordchainEnabled,
+    wordscramble: guildConfig.wordscrambleEnabled
+  } : { wordchain: false, wordscramble: false };
 
   const statsData = {
     success: true,
@@ -255,7 +338,6 @@ app.get("/api/stats", (req, res) => {
     features
   };
 
-  // Chỉ trả về guildsCount nếu người gọi là Chủ Bot (Bot Owner)
   if (isOwner) {
     statsData.guildsCount = client && client.guilds ? client.guilds.cache.size : 0;
   }
@@ -290,8 +372,8 @@ app.get("/api/channels", requireAuth, (req, res) => {
   }
 });
 
-// API: Bật/Tắt tính năng minigame theo từng Guild (Có bảo mật phân quyền)
-app.post("/api/features/toggle", requireAuth, (req, res) => {
+// API: Bật/Tắt tính năng minigame theo từng Guild (Legacy endpoint maintained for compatibility)
+app.post("/api/features/toggle", requireAuth, async (req, res) => {
   const { feature, enabled, guildId } = req.body;
   if (!guildId) {
     return res.status(400).json({ success: false, error: "Vui lòng chọn Server (guildId)!" });
@@ -306,14 +388,31 @@ app.post("/api/features/toggle", requireAuth, (req, res) => {
     return res.status(400).json({ success: false, error: "Tính năng không hợp lệ!" });
   }
 
-  const guildFeatures = getGuildFeatures(guildId);
-  guildFeatures[feature] = !!enabled;
-  featureStatesMap.set(guildId, guildFeatures);
+  const updateField = feature === "wordchain" ? { wordchainEnabled: !!enabled } : { wordscrambleEnabled: !!enabled };
 
-  res.json({ success: true, features: guildFeatures });
+  try {
+    const updatedDoc = await GuildConfigModel.findOneAndUpdate(
+      { guildId },
+      { $set: updateField },
+      { new: true, upsert: true }
+    );
+
+    const configObj = updatedDoc.toObject();
+    guildConfigsCache.set(guildId, configObj);
+
+    res.json({
+      success: true,
+      features: {
+        wordchain: configObj.wordchainEnabled,
+        wordscramble: configObj.wordscrambleEnabled
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-// API: Đăng Embed hoặc Tin Nhắn Thường (Có kiểm tra quyền đăng vào Guild)
+// API: Đăng Embed hoặc Tin Nhắn Thường
 app.post("/api/send-embed", requireAuth, async (req, res) => {
   try {
     const { content: msgContent, channelId, title, description, url, color, imageUrl, thumbnailUrl, authorName, authorIcon, footerText, footerIcon, fields } = req.body;
@@ -443,7 +542,6 @@ client.once(Events.ClientReady, async () => {
     console.error("❌ Error checking/sending help embed to rules channel:", err);
   }
 
-  // Initialize WuWa Code Watcher for the Owner silently
   try {
     initWuwaCodeWatcher(client);
   } catch (err) {
@@ -455,12 +553,22 @@ client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   try {
     if (message.guild) {
-      const guildFeatures = getGuildFeatures(message.guild.id);
-      if (guildFeatures.wordchain) {
-        onWordChainMessage(client)(message).catch((err) => console.error("❌ Error in onWordChainMessage:", err));
-      }
-      if (guildFeatures.wordscramble) {
-        onWordScrambleMessage(client)(message).catch((err) => console.error("❌ Error in onWordScrambleMessage:", err));
+      const guildConfig = await getGuildConfig(message.guild.id);
+      if (guildConfig) {
+        // Minigame Nối Từ
+        if (guildConfig.wordchainEnabled) {
+          const targetCh = guildConfig.wordchainChannelId || WORDCHAIN_CHANNEL_ID;
+          if (message.channel.id === targetCh) {
+            onWordChainMessage(client)(message).catch((err) => console.error("❌ Error in onWordChainMessage:", err));
+          }
+        }
+        // Minigame Sắp Xếp Từ
+        if (guildConfig.wordscrambleEnabled) {
+          const targetCh = guildConfig.wordscrambleChannelId || WORDSCRAMBLE_CHANNEL_ID;
+          if (message.channel.id === targetCh) {
+            onWordScrambleMessage(client)(message).catch((err) => console.error("❌ Error in onWordScrambleMessage:", err));
+          }
+        }
       }
     }
     onWuwaCodeMessage(client)(message).catch((err) => console.error("❌ Error in onWuwaCodeMessage:", err));
