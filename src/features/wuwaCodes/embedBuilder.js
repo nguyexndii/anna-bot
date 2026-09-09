@@ -6,7 +6,7 @@ const { translateDurationToVN } = require("./wuwaUtils");
 const ASTRITE_ICON_URL = "https://static.wikia.nocookie.net/wutheringwaves/images/1/16/Item_Astrite.png/revision/latest/scale-to-width-down/150";
 
 /**
- * Creates a Discord Embed for Wuthering Waves Redeem Codes
+ * Creates a Discord Embed for Wuthering Waves Redeem Codes (Modern, minimal & elegant)
  * @param {Object} codeObj
  * @returns {Promise<EmbedBuilder>}
  */
@@ -20,16 +20,16 @@ async function createWuwaCodeEmbed(codeObj) {
   const rewardsContent = codeObj.rewardsText || "• Chưa có thông tin phần thưởng";
 
   const embed = new EmbedBuilder()
-    .setTitle(`${emojiMention} REDEEM CODE MỚI – WUTHERING WAVES`)
-    .setColor("#00E5FF")
+    .setTitle(`${emojiMention} WUTHERING WAVES — REDEEM CODE`)
+    .setColor("#00D2FF")
     .setThumbnail(ASTRITE_ICON_URL)
     .setDescription(
-      `🔑 **Mã Code:** \`${codeObj.code}\`\n\n` +
-      `🎁 **Phần thưởng nhận được**\n${rewardsContent}\n\n` +
-      `⏳ **Thời hạn / Trạng thái**\n\`${durationVN}\``
+      `### \`${codeObj.code}\`\n\n` +
+      `**Phần thưởng:**\n${rewardsContent}\n\n` +
+      `**Trạng thái:** \`${durationVN}\``
     )
     .setFooter({
-      text: "Nhập code trong Settings game",
+      text: "Wuthering Waves • Giftcode Alert",
       iconURL: defaultIconUrl,
     })
     .setTimestamp();
@@ -54,15 +54,15 @@ async function createWuwaExpiringSoonEmbed(expiringCodes) {
   }
 
   const embed = new EmbedBuilder()
-    .setTitle(`${emojiMention} ⚠️ CẢNH BÁO: CODE SẮP HẾT HẠN TRONG 24H!`)
+    .setTitle(`${emojiMention} CẢNH BÁO: CODE SẮP HẾT HẠN (24H)`)
     .setDescription(
-      "Dưới đây là danh sách các Redeem Code Wuthering Waves **sắp hết hạn trong vòng 24 giờ tới**. Hãy nhanh tay nhập ngay kẻo lỡ nhé!\n\n" +
+      "Các mã quà tặng dưới đây **sắp hết hạn trong 24 giờ tới**. Hãy nhanh chóng nhập vào tài khoản nhé:\n\n" +
       lines.join("\n")
     )
-    .setColor("#FF3838")
+    .setColor("#FF4757")
     .setThumbnail(ASTRITE_ICON_URL)
     .setFooter({
-      text: "Nhập code trong Settings game",
+      text: "Wuthering Waves • Expiry Alert",
       iconURL: defaultIconUrl,
     })
     .setTimestamp();

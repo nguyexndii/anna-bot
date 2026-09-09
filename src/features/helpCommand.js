@@ -30,7 +30,7 @@ function createMasterHelpEmbed() {
         name: "🔤 GAME NỐI TỪ (WORD CHAIN)",
         value:
           `📌 **Kênh sử dụng:** Kênh Nối Từ (<#${WORDCHAIN_CHANNEL_ID || "1450065511231520778"}>)\n` +
-          `• \`!goiy\` / \`!gợi ý\` ➔ Xin gợi ý từ tiếp theo từ AI (Cooldown 2 phút).\n` +
+          `• \`!goiy\` / \`!gợi ý\` ➔ Xin gợi ý từ tiếp theo (Cooldown 2 phút).\n` +
           `• \`!bxh\` / \`!bangxephang\` ➔ Xem Bảng xếp hạng người chơi Nối từ xuất sắc.\n` +
           `• \`!luatchoi\` / \`!huongdan\` ➔ Xem chi tiết luật chơi Nối từ.\n` +
           `• \`!batdau\` *(Admin)* ➔ Khởi tạo ván chơi Nối từ mới.`,
@@ -50,28 +50,44 @@ function createMasterHelpEmbed() {
         name: "⚙️ HỆ THỐNG & TRỢ GIÚP CHUNG",
         value:
           `📌 **Kênh sử dụng:** Tất cả các kênh trong server\n` +
-          `• \`!lenhanna\` ➔ Xem bảng danh sách toàn bộ lệnh bot.\n` +
+          `• \`!lenh\` / \`!help\` / \`!command\` / \`!comment\` / \`!lenhanna\` ➔ Xem bảng danh sách toàn bộ lệnh bot.\n` +
           `• \`alo\` ➔ Gọi tổng đài bot phản hồi vui.`,
         inline: false,
       }
     )
-    .setFooter({ text: "Bot Discord • Hãy gõ đúng lệnh vào đúng kênh tương ứng nhé!" })
+    .setFooter({ text: "Bot Discord • Gõ !lenh hoặc !help hoặc !command bất cứ khi nào bạn cần nhé!" })
     .setTimestamp();
 
   return embed;
 }
 
+const MASTER_HELP_COMMANDS = [
+  "!lenh",
+  "!lenhanna",
+  "!help",
+  "!command",
+  "!commands",
+  "!comment",
+  "!comments",
+  "!menu",
+  "!trogiup",
+  "!bot",
+];
+
+function isMasterHelpCommand(text) {
+  if (!text || typeof text !== "string") return false;
+  return MASTER_HELP_COMMANDS.includes(text.trim().toLowerCase());
+}
+
 /**
- * Handle master help message command (!lenhanna)
+ * Handle master help message command (!lenh, !help, !command, !comment, !lenhanna...)
  * @param {import("discord.js").Client} client
  */
 function onHelpMessage(client) {
   return async (message) => {
     if (!message.content || message.author.bot) return;
 
-    const lower = message.content.trim().toLowerCase();
-
-    if (lower === "!lenhanna") {
+    if (isMasterHelpCommand(message.content)) {
       try {
         const helpEmbed = createMasterHelpEmbed();
         await message.reply({ embeds: [helpEmbed] });
@@ -82,4 +98,4 @@ function onHelpMessage(client) {
   };
 }
 
-module.exports = { createMasterHelpEmbed, onHelpMessage };
+module.exports = { createMasterHelpEmbed, onHelpMessage, isMasterHelpCommand };

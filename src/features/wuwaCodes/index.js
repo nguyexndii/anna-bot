@@ -168,7 +168,7 @@ async function checkAndNotifyWuwaCodes(client) {
               isActive: true,
               notified: true,
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
           );
         } catch (dbSaveErr) {
           console.error(`⚠️ Không thể lưu code "${codeStr}" vào MongoDB:`, dbSaveErr.message);
@@ -274,7 +274,7 @@ async function addManualCode(client, codeObj) {
           isActive: true,
           notified: true,
         },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     } catch (dbSaveErr) {
       console.error(`⚠️ Không thể lưu code "${codeStr}" vào DB:`, dbSaveErr.message);

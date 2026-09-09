@@ -1,7 +1,13 @@
 // src/features/wordchain/aiValidator.service.js
-const { GEMINI_API_KEYS, GEMINI_MODEL_URL } = require("../../config/env");
+const { GEMINI_API_KEYS } = require("../../config/env");
 
 let currentKeyIndex = 0;
+
+// Thứ tự ưu tiên Model: gemini-3.5-flash-lite trước, nếu lỗi chuyển sang gemini-3.1-flash-lite
+const GEMINI_MODELS = [
+  "gemini-3.5-flash-lite", // Mặc định ưu tiên 1
+  "gemini-3.1-flash-lite", // Dự phòng ưu tiên 2 khi lỗi
+];
 
 /**
  * Get next API key in Round-Robin order
@@ -14,8 +20,8 @@ function getNextApiKey() {
 }
 
 /**
- * Call Gemini API with Multi-Key Rotation & Automatic Fallback Retry
- * If Key 1 fails (HTTP 429/403), it automatically retries with Key 2, Key 3...
+ * Call Gemini API with Multi-Model Fallback & Multi-Key Rotation
+ * Thử gemini-3.5-flash-lite trước, nếu lỗi tự động chuyển sang gemini-3.1-flash-lite
  * @param {string} prompt 
  * @param {number} temperature 
  * @returns {Promise<object|null>}
@@ -35,28 +41,30 @@ async function callGeminiApi(prompt, temperature = 0.1) {
     },
   };
 
-  const totalKeys = GEMINI_API_KEYS.length;
-  for (let attempt = 0; attempt < totalKeys; attempt++) {
-    const apiKey = getNextApiKey();
-    if (!apiKey) continue;
+  for (const modelName of GEMINI_MODELS) {
+    const totalKeys = GEMINI_API_KEYS.length;
+    for (let attempt = 0; attempt < totalKeys; attempt++) {
+      const apiKey = getNextApiKey();
+      if (!apiKey) continue;
 
-    const url = `${GEMINI_MODEL_URL}${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        return data;
+        if (response.ok) {
+          const data = await response.json();
+          return data;
+        }
+
+        console.warn(`⚠️ Model ${modelName} với Key [${apiKey.slice(0, 8)}...] trả về HTTP ${response.status}. Thử tiếp...`);
+      } catch (err) {
+        console.error(`❌ Lỗi gọi ${modelName} với Key [${apiKey.slice(0, 8)}...]:`, err.message);
       }
-
-      console.warn(`⚠️ Gemini Key [${apiKey.slice(0, 8)}...] trả về HTTP ${response.status}. Đang chuyển Key tiếp theo...`);
-    } catch (err) {
-      console.error(`❌ Lỗi gọi Gemini với Key [${apiKey.slice(0, 8)}...]:`, err.message);
     }
   }
 
@@ -64,7 +72,7 @@ async function callGeminiApi(prompt, temperature = 0.1) {
 }
 
 /**
- * Ask Gemini 3.1 Flash Lite if a 2-word Vietnamese phrase is valid (Strict verification)
+ * Thẩm định xem cụm 2 từ tiếng Việt có nghĩa và hợp lệ không
  * @param {string} firstWord 
  * @param {string} secondWord 
  * @returns {Promise<{valid: boolean, explanation: string}>}
@@ -104,9 +112,9 @@ Bắt buộc trả về đúng định dạng JSON:
 }
 
 /**
- * Get system hint for next words starting with expectedWord (with double verification)
+ * Gợi ý các từ tiếp theo bắt đầu bằng expectedWord
  * @param {string} expectedWord 
- * @returns {Promise<string[]>} List of 3 suggested words
+ * @returns {Promise<string[]>} Danh sách gợi ý
  */
 async function getAIHint(expectedWord) {
   const prompt = `Trong trò chơi Nối Từ tiếng Việt, từ tiếp theo phải BẮT ĐẦU bằng từ "${expectedWord}".
@@ -125,7 +133,7 @@ Bắt buộc trả về đúng định dạng JSON:
       const parsed = JSON.parse(text);
       const rawSuggestions = parsed.suggestions || [];
 
-      // Double-check hints to make sure every hint is 100% valid before sending
+      // Double-check hints để đảm bảo từ gợi ý chuẩn
       const verifiedSuggestions = [];
       for (const hint of rawSuggestions) {
         const secondWord = hint.split(/\s+/).pop() || hint;

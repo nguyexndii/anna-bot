@@ -1,8 +1,24 @@
 // src/utils/emojiManager.js
-const { DEFAULT_REACTIONS, REACTION_GROUPS, EMOTION_CHANCE } = require("../config/reactions");
+const { DEFAULT_REACTIONS, REACTION_GROUPS, REACTION_CHANCE } = require("../config/reactions");
 
 /**
- * Lấy Emoji Mặc Định khi gõ ĐÚNG (ngẫu nhiên 1 trong 2 icon)
+ * Thả reaction an toàn kèm fallback sang Unicode emoji nếu custom emoji gặp lỗi
+ * @param {object} message - Discord Message
+ * @param {string} emoji - Custom Emoji ID hoặc Unicode
+ * @param {string} fallbackUnicode - Icon Unicode dự phòng
+ */
+async function safeReact(message, emoji, fallbackUnicode = "❓") {
+  try {
+    await message.react(emoji);
+  } catch (err) {
+    if (fallbackUnicode) {
+      await message.react(fallbackUnicode).catch(() => {});
+    }
+  }
+}
+
+/**
+ * Lấy Emoji Mặc Định khi gõ ĐÚNG
  * @returns {string} Emoji ID
  */
 function getDefaultCorrectEmoji() {
@@ -20,7 +36,7 @@ function getDefaultWrongEmoji() {
 
 /**
  * Lấy Emoji Cảm xúc ngẫu nhiên theo nhóm
- * @param {string} category - 'SUPER_DUMB' | 'BRUH' | 'CLOWN' | 'SURPRISED' | 'CRY' | 'SKULL' | 'COOL' | 'SHUT' | 'CHILL'
+ * @param {string} category
  * @returns {string} Emoji ID
  */
 function getRandomEmotionEmoji(category = "COOL") {
@@ -29,42 +45,68 @@ function getRandomEmotionEmoji(category = "COOL") {
 }
 
 /**
- * Thả Reaction thông minh vào tin nhắn với tỷ lệ 20% ngẫu nhiên
+ * Thả Reaction ngẫu nhiên & hài hước vào tin nhắn:
+ * Không phải tin nào cũng react! Chỉ ngẫu nhiên ~30% mới thả reaction tạo bất ngờ vui nhộn.
+ * Trừ khi thắng ván (win) thì luôn luôn react cúp chúc mừng.
  * @param {object} message - Discord Message
  * @param {boolean} isCorrect - Trạng thái từ đúng hay sai
- * @param {boolean} isSuperDumb - Trạng thái nếu gõ quá ngu ngu
+ * @param {string|boolean} [reasonOrDumb] - 'wrong_spelling' | 'duplicate' | 'reversal' | 'not_in_dict' | 'scramble_wrong' | 'win' | 'scramble_win' | 'normal' | boolean
  */
-async function applySmartMoveReaction(message, isCorrect, isSuperDumb = false) {
+async function applySmartMoveReaction(message, isCorrect, reasonOrDumb = false) {
   try {
-    if (isCorrect) {
-      // 1. Thả icon ĐÚNG mặc định
-      const correctEmoji = getDefaultCorrectEmoji();
-      await message.react(correctEmoji);
+    const isWin = reasonOrDumb === "win" || reasonOrDumb === "scramble_win";
 
-      // 2. Tỷ lệ 20% ngẫu nhiên thả thêm 1 icon cảm xúc ngầu / đắc thắng / chill
-      if (Math.random() < EMOTION_CHANCE) {
+    // Không phải tin nào cũng react: Chỉ ~30% ngẫu nhiên mới thả reaction (trừ khi thắng ván thì luôn thả cúp)
+    if (!isWin && Math.random() > (REACTION_CHANCE || 0.30)) {
+      return;
+    }
+
+    if (isCorrect) {
+      if (isWin) {
+        await safeReact(message, "🏆", "🎉");
+      } else {
+        // Thả 1 icon ngẫu nhiên khen ngợi / ngầu / vui mừng
         const categories = ["COOL", "CHILL", "SURPRISED"];
         const chosenCategory = categories[Math.floor(Math.random() * categories.length)];
         const extraEmoji = getRandomEmotionEmoji(chosenCategory);
-        await message.react(extraEmoji).catch(() => {});
+        await safeReact(message, extraEmoji, "🎉");
       }
     } else {
-      // 1. Thả icon SAI mặc định (figurinha3068)
-      const wrongEmoji = getDefaultWrongEmoji();
-      await message.react(wrongEmoji);
+      // Khi SAI: Thả 1 icon hài hước / cà khịa / troll tùy theo tình huống
+      let chosenCategory;
+      let fallbackEmoji = "🤡";
 
-      // 2. Tỷ lệ 20% ngẫu nhiên thả thêm 1 icon cảm xúc
-      if (Math.random() < EMOTION_CHANCE) {
-        let chosenCategory = "CLOWN";
-        if (isSuperDumb) {
-          chosenCategory = "SUPER_DUMB"; // Bonk!
-        } else {
-          const categories = ["SUPER_DUMB", "BRUH", "CLOWN", "CRY", "SKULL"];
-          chosenCategory = categories[Math.floor(Math.random() * categories.length)];
-        }
-        const extraEmoji = getRandomEmotionEmoji(chosenCategory);
-        await message.react(extraEmoji).catch(() => {});
+      if (reasonOrDumb === "wrong_spelling" || reasonOrDumb === true) {
+        // Sai vần / gõ sai chữ đầu -> Bonk, NOOB, dumb, pepecringe
+        chosenCategory = "SUPER_DUMB";
+        fallbackEmoji = "🤦‍♂️";
+      } else if (reasonOrDumb === "duplicate") {
+        // Lặp từ cũ -> Bruh, Cạn lời
+        chosenCategory = "BRUH";
+        fallbackEmoji = "🗿";
+      } else if (reasonOrDumb === "reversal") {
+        // Bắt bài lặp từ vừa đảo -> stfu, bớt mồm
+        chosenCategory = "SHUT";
+        fallbackEmoji = "🤨";
+      } else if (reasonOrDumb === "not_in_dict") {
+        // Chế từ / không có trong từ điển -> who_tf, Hề, Cười nhạo
+        const options = ["SURPRISED", "CLOWN", "SUPER_DUMB", "CRY"];
+        chosenCategory = options[Math.floor(Math.random() * options.length)];
+        fallbackEmoji = "🤣";
+      } else if (reasonOrDumb === "scramble_wrong") {
+        // Đoán sai sắp xếp từ -> Hề hước, NOOB, who_tf
+        const options = ["SUPER_DUMB", "CLOWN", "SURPRISED"];
+        chosenCategory = options[Math.floor(Math.random() * options.length)];
+        fallbackEmoji = "🤡";
+      } else {
+        // Mặc định chung cho các lỗi khác
+        const categories = ["SUPER_DUMB", "BRUH", "CLOWN", "SURPRISED", "CRY", "SHUT"];
+        chosenCategory = categories[Math.floor(Math.random() * categories.length)];
+        fallbackEmoji = "💀";
       }
+
+      const extraEmoji = getRandomEmotionEmoji(chosenCategory);
+      await safeReact(message, extraEmoji, fallbackEmoji);
     }
   } catch (err) {
     console.error(`❌ Error in applySmartMoveReaction to ${message.id}:`, err.message);
@@ -72,6 +114,7 @@ async function applySmartMoveReaction(message, isCorrect, isSuperDumb = false) {
 }
 
 module.exports = {
+  safeReact,
   getDefaultCorrectEmoji,
   getDefaultWrongEmoji,
   getRandomEmotionEmoji,

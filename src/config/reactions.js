@@ -2,24 +2,30 @@
 // Quản lý tập trung toàn bộ Reaction Custom Emoji để tái sử dụng cho tất cả các trò chơi & tính năng sau này
 
 module.exports = {
-  // Tỷ lệ xuất hiện reaction cảm xúc ngẫu nhiên (Giảm xuống 10% để không bị loạn kênh chat)
-  EMOTION_CHANCE: 0.10,
+  // Tỷ lệ xuất hiện reaction ngẫu nhiên (30% để không bị ngợp chat, tin nào cũng react)
+  REACTION_CHANCE: 0.30,
 
   // Reaction Mặc định khi gõ ĐÚNG hoặc SAI
   DEFAULT_REACTIONS: {
     WRONG: "1535702563855536280", // Icon mặc định khi gõ SAI (figurinha3068)
     CORRECT: [
-      "1535703901029007400",    // Icon mặc định ĐÚNG 1
-      "1535703899275788450",    // Icon mặc định ĐÚNG 2
+      "1535703901029007400",      // Icon mặc định ĐÚNG 1 (clap)
+      "1535703899275788450",      // Icon mặc định ĐÚNG 2
+      "1456676543538532515",      // Icon Gg
     ],
   },
 
-  // Phân loại các Nhóm Reaction Cảm Xúc để tái sử dụng
+  // Phân loại các Nhóm Reaction Cảm Xúc Hài Hước & Độc Đáo
   REACTION_GROUPS: {
-    // 🔨 Trả lời ngu ngu / Sai vần
-    SUPER_DUMB: ["1535702546478530610"], // bonk
+    // 🔨 Trả lời ngáo ngơ / Sai vần (Bonk, NOOB, dumb, pepecringe)
+    SUPER_DUMB: [
+      "1535702546478530610", // bonk
+      "1456676563813929151", // NOOB
+      "1535702556465041551", // dumb
+      "1456676568003903529", // pepecringe
+    ],
 
-    // 🗿 Bruh / Bó tay / Cạn lời
+    // 🗿 Bruh / Bó tay / Lặp từ
     BRUH: [
       "1535702548286275684", // bruh
       "1535702553457725440", // dilucspeechless
@@ -27,15 +33,17 @@ module.exports = {
       "1535702568960004137", // kuruunamused
     ],
 
-    // 🤡 Hề hước / Chơi ngu
+    // 🤡 Hề hước / Cười nhạo / Chế từ
     CLOWN: [
       "1535702550857384047", // clown
       "1535702573414354954", // pepeclownwave
-      "1535702556465041551", // dumb
+      "1456676548336943380", // hahah
+      "1456676557371215943", // meme
     ],
 
-    // 🤨 Ủa / Bất ngờ
+    // 🤨 Ủa cái gì vậy / Bất ngờ (who_tf, wellthen, unamusedchamber)
     SURPRISED: [
+      "1535325912344694874", // who_tf
       "1535695600601931797", // 668900wellthen
       "1535702583543463936", // unamusedchamber3
     ],
@@ -48,29 +56,32 @@ module.exports = {
       "1535702532192469052", // 1crywaifu65
     ],
 
-    // 💀 Xỉu / Gục ngã
+    // 💀 Xỉu / Gục ngã / Cạn lời
     SKULL: [
       "1535702578908631080", // skullstatusicon
     ],
 
-    // 💪 Siêu ngầu / Đắc thắng
+    // 💪 Siêu ngầu / Đắc thắng / Trả lời đúng
     COOL: [
       "1535695595883462716", // 249299strongpepe
       "1535702581492318359", // tomhehe
       "1535702566468452362", // kirbyjam94
       "1535697932723167364", // Anime
+      "1535325638125166662", // iu_em
     ],
 
-    // 🤐 Bớt mồm / Im lặng
+    // 🤐 Cà khịa / Bớt mồm / Cấm đảo từ
     SHUT: [
+      "1535324293120925817", // stfu
       "1535694953563431022", // 861449shutseagullmeme
       "1535695602699210953", // 893425gooby
     ],
 
-    // 😺 Chill
+    // 😺 Chill / Thư thái
     CHILL: [
       "1535695598764822598", // 400561drollingcat
       "1535702561590480998", // emoji
+      "1456676570315096214", // toifeelsokayman
     ],
   },
 };

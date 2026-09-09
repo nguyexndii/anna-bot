@@ -258,7 +258,7 @@ function recordScrambleWin(userId, username) {
     LeaderboardModel.findOneAndUpdate(
       { game: "wordscramble", userId },
       { $inc: { wins: 1 }, $set: { username } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     ).catch(err => console.error("❌ Error updating MongoDB Atlas scramble leaderboard:", err.message));
   }
 

@@ -118,7 +118,9 @@ function checkReversal(normalizedWord) {
  * @param {string} username - Player's username
  */
 function updateState(originalWord, normalizedWord, userId, username) {
-  if (!gameState) return;
+  if (!gameState) {
+    return { sessionScore: 0, currentWord: originalWord, expectedKey: "", moveCount: 0 };
+  }
 
   gameState.currentWord = originalWord;
   gameState.normalizedWord = normalizedWord;
@@ -144,13 +146,20 @@ function updateState(originalWord, normalizedWord, userId, username) {
   console.log(
     `✅ State updated: word="${originalWord}", expectedKey="${gameState.expectedKey}", moves=${gameState.moveCount}, ${username}: ${userScore.correctWords} words`
   );
+
+  return {
+    sessionScore: userScore.correctWords,
+    currentWord: originalWord,
+    expectedKey: gameState.expectedKey,
+    moveCount: gameState.moveCount,
+  };
 }
 
 /**
  * Record a win for a player
  * @param {string} userId
  * @param {string} username
- * @returns {number} Total wins for this player
+ * @returns {{wins: number, sessionScore: number}}
  */
 function recordWin(userId, username) {
   if (!playerScores.has(userId)) {
@@ -169,12 +178,19 @@ function recordWin(userId, username) {
     LeaderboardModel.findOneAndUpdate(
       { game: "wordchain", userId },
       { $inc: { wins: 1 }, $set: { username } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     ).catch((err) => console.error("❌ Error updating MongoDB Atlas wordchain leaderboard:", err.message));
   }
 
+  const sessionScore = (gameState && gameState.sessionScores && gameState.sessionScores.get(userId))
+    ? gameState.sessionScores.get(userId).correctWords
+    : 1;
+
   console.log(`🏆 Win recorded for ${username} (${userId}). Total wins: ${player.wins}`);
-  return player.wins;
+  return {
+    wins: player.wins,
+    sessionScore,
+  };
 }
 
 /**
