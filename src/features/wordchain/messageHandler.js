@@ -293,7 +293,6 @@ function onWordChainMessage(client) {
         const winResult = recordWin(userId, username);
 
         await applySmartMoveReaction(message, true, "win");
-        await message.react("🏆").catch(() => {});
 
         const winEmbed = createWinEmbed(username, content, winResult.wins, winResult.sessionScore);
         await sendWebhook(
