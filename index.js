@@ -13,7 +13,12 @@ const {
   RULES_CHANNEL_ID,
   WUWA_CODES_CHANNEL_ID,
   ALLOWED_GUILD_IDS,
+  KEEP_VOICE_CHANNEL_ID,
+  ENABLE_VOICE_KEEPER,
 } = require("./src/config/env");
+
+// 24/7 Smart Voice Room Keeper
+const { initVoiceKeeper, getVoiceKeeperStatus } = require("./src/features/voiceKeeper");
 
 const isAllowedGuild = (guildId) => {
   if (!ALLOWED_GUILD_IDS || ALLOWED_GUILD_IDS.length === 0) return true;
@@ -65,19 +70,35 @@ function formatUptime(seconds) {
   return parts.join(" ");
 }
 
+function getMemoryStats() {
+  const mem = process.memoryUsage();
+  const toMB = (bytes) => `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB`;
+  const rssMB = Math.round(mem.rss / 1024 / 1024);
+  return {
+    rss: toMB(mem.rss),
+    heapUsed: toMB(mem.heapUsed),
+    heapTotal: toMB(mem.heapTotal),
+    renderLimit: "512 MB",
+    percentOf512MB: `${Math.round((rssMB / 512) * 1000) / 10}%`,
+  };
+}
+
 app.get("/", (req, res) => {
   res.json({
     status: "online",
-    botName: "Anna Bot (Minigames & WuWa)",
+    botName: "Anna Bot (Minigames, WuWa & Voice Keeper)",
     isReady: client ? client.isReady() : false,
     mode: IS_TEST_MODE ? "TEST_MODE" : "PRODUCTION_MODE",
     ping: client && client.ws ? `${client.ws.ping}ms` : "N/A",
     uptime: formatUptime(process.uptime()),
+    memory: getMemoryStats(),
+    voiceKeeper: getVoiceKeeperStatus(),
     channels: {
       wordchain: WORDCHAIN_CHANNEL_ID,
       wordscramble: WORDSCRAMBLE_CHANNEL_ID,
       wuwaCodes: WUWA_CODES_CHANNEL_ID,
       rules: RULES_CHANNEL_ID,
+      voiceKeeperRoom: KEEP_VOICE_CHANNEL_ID,
     },
     prodChannels: PROD_CHANNELS,
     testChannels: TEST_CHANNELS,
@@ -102,6 +123,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 
@@ -218,6 +240,13 @@ client.once(Events.ClientReady, async () => {
     console.log(`🎁 Săn Code Wuthering Waves đã kích hoạt tại kênh <#${WUWA_CODES_CHANNEL_ID}>`);
   } catch (err) {
     console.error("❌ Lỗi khởi tạo WuWa Code Watcher:", err.message);
+  }
+
+  // Initialize 24/7 Smart Voice Room Keeper
+  try {
+    initVoiceKeeper(client);
+  } catch (err) {
+    console.error("❌ Lỗi khởi tạo Voice Keeper:", err.message);
   }
 });
 

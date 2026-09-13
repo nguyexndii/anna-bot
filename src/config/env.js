@@ -58,6 +58,10 @@ module.exports = {
   WUWA_ROLE_ID: process.env.WUWA_ROLE_ID || (ROLES && ROLES.WUWA_ROLE) || null,
   WUWA_EMOJI_ID: (EMOJIS && EMOJIS.WUWA_ICON) || "1536322393411424286",
 
+  // 24/7 Smart Voice Room Keeper
+  KEEP_VOICE_CHANNEL_ID: process.env.KEEP_VOICE_CHANNEL_ID || "1389843439851671624",
+  ENABLE_VOICE_KEEPER: process.env.ENABLE_VOICE_KEEPER !== "false",
+
   // Gemini config (Model: gemini-3.1-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(",").map((k) => k.trim()).filter(Boolean),
   GEMINI_MODEL_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=",
