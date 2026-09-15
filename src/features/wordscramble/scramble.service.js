@@ -183,50 +183,78 @@ async function restoreScrambleState(scrambleChannel = null) {
   }
 }
 
-// Rich backup pool of 100+ diverse Vietnamese 2-word phrases
-const BACKUP_WORDS = [
-  // Cảm xúc & Tâm lý
-  "hạnh phúc", "bình an", "yêu thương", "trí tuệ", "thành công",
-  "kiên trì", "sáng tạo", "phát triển", "tự do", "dũng cảm",
-  "đoàn kết", "trách nhiệm", "khiêm tốn", "trung thực", "nhiệt huyết",
-  "khát vọng", "tương lai", "hy vọng", "bảo vệ", "xây dựng",
-  "giao lưu", "thưởng thức", "kỷ niệm", "nguy hiểm", "thử thách",
-  "chiến thắng", "nỗ lực", "vinh quang", "tự hào", "đam đam",
-  "lý tưởng", "nghệ thuật", "kiến thức", "kinh nghiệm", "kỹ năng",
-  "thân thiện", "lạc quan", "vui vẻ", "hào hứng", "trân trọng",
-  "bình tĩnh", "tự tin", "quyết tâm", "bao dung", "nhân ái",
-  "khiêm nhường", "thành thật", "tình cảm", "gắn kết", "chia sẻ",
+// Rich backup pool of challenging Vietnamese 2-word phrases with contextual definition hints
+const BACKUP_CHALLENGES = [
+  // Từ láy tượng hình & tâm trạng sâu sắc
+  { word: "khắc khoải", hint: "Tâm trạng bồn chồn, lo lắng day dứt khôn nguôi." },
+  { word: "bàng hoàng", hint: "Cảm giác sững sờ, kinh ngạc trước biến cố bất ngờ." },
+  { word: "chông chênh", hint: "Ở thế không vững vàng, dễ nghiêng ngả chao đảo." },
+  { word: "nghiệt ngã", hint: "Khắc nghiệt, cay đắng và không khoan nhượng." },
+  { word: "quạnh quẽ", hint: "Cảnh tượng vắng vẻ, cô đơn và trống trải đến nao lòng." },
+  { word: "huyễn hoặc", hint: "Mơ hồ, hão huyền và dễ khiến người ta mê muội." },
+  { word: "xao xuyến", hint: "Cảm giác bâng khuâng, rung động êm dịu trong lòng." },
+  { word: "thao thức", hint: "Trằn trọc không ngủ được vì suy nghĩ miên man." },
+  { word: "chập chùng", hint: "Nhấp nhô nối tiếp nhau lớp này đến lớp khác." },
+  { word: "rạo rực", hint: "Cảm xúc hưng phấn, sôi nổi dâng trào trong lòng." },
+  { word: "bâng khuâng", hint: "Nỗi niềm man mác, ngơ ngẩn khó tả thành lời." },
+  { word: "hoang hoải", hint: "Cảm giác trống vắng, mơ hồ và buồn miên man." },
+  { word: "liêu xiêu", hint: "Dáng vẻ xiêu vẹo, không đứng vững trước gió bão." },
+  { word: "lênh đênh", hint: "Trôi nổi phiêu dạt trên mặt nước vô định." },
+  { word: "chới với", hint: "Vung vẫy trong thế mất thăng bằng, bất lực." },
+  { word: "ngập ngừng", hint: "Lưỡng lự, do dự chưa dứt khoát đưa ra hành động." },
+  { word: "day dứt", hint: "Nỗi đau âm ỉ, áy náy khôn nguôi trong tâm can." },
+  { word: "rêu phong", hint: "Dấu tích của thời gian phủ lên cảnh vật xưa cũ." },
+  { word: "tiều tụy", hint: "Vẻ ngoài xơ xác, gầy gò vì mệt mỏi và gian truân." },
+  { word: "bạc bẽo", hint: "Lòng dạ thay đổi nhanh chóng, không trọn vẹn tình nghĩa." },
+  { word: "mênh mang", hint: "Rộng lớn bao la đến ngút ngàn tầm mắt." },
+  { word: "hắt hiu", hint: "Thổi nhè nhẹ từng cơn buồn bã, gợi sự cô đơn." },
+  { word: "hun hút", hint: "Sâu hoặc xa tít tắp, tạo cảm giác vô tận rợn ngợp." },
+  { word: "ngút ngàn", hint: "Trải dài vượt xa tầm mắt, vô cùng tận." },
+  { word: "hụt hẫng", hint: "Cảm giác mất chỗ dựa bất ngờ, hụt chân về mặt cảm xúc." },
 
-  // Thiên nhiên & Vũ trụ
-  "mặt trời", "mặt trăng", "ngôi sao", "vũ trụ", "hành tinh",
-  "bão táp", "nắng sớm", "mưa rào", "hoàng hôn", "bình minh",
-  "dòng sông", "biển cả", "ngọn núi", "rừng xanh", "cánh đồng",
-  "thung lũng", "thác nước", "đám mây", "làn gió", "tuyết trắng",
-  "sương mù", "sấm sét", "cầu vồng", "thủy triều", "san hô",
-  "đảo ngọc", "hang động", "sa mạc", "thảo nguyên", "suối mát",
+  // Từ Hán - Việt thâm thúy & Phẩm chất
+  { word: "uyên bác", hint: "Học vấn sâu rộng, am hiểu tinh thông mọi sự." },
+  { word: "khảng khái", hint: "Hào hiệp, thẳng thắn và không toan tính nhỏ nhen." },
+  { word: "phù phiếm", hint: "Hào nhoáng bề ngoài nhưng rỗng tuếch, vô nghĩa." },
+  { word: "tịch mịch", hint: "Yên lặng, tĩnh mịch đến mức u tịch cô quạnh." },
+  { word: "trầm mặc", hint: "Trầm ngâm, tĩnh lặng và suy tư sâu sắc." },
+  { word: "can trường", hint: "Gan dạ, dũng cảm và kiên cường trước nguy nan." },
+  { word: "bất khuất", hint: "Không chịu khuất phục trước uy quyền hay hiểm nguy." },
+  { word: "mẫn tiệp", hint: "Nhanh nhẹn, thông minh và sắc sảo trong nhận thức." },
+  { word: "tiêu dao", hint: "Thong dong tự tại, không vướng bận sự đời." },
+  { word: "huyên náo", hint: "Ồn ào, rộn rã và náo nhiệt với nhiều âm thanh." },
+  { word: "ngạo nghễ", hint: "Ngẩng cao đầu đầy kiêu hãnh và bất cần." },
+  { word: "thâm sâu", hint: "Sâu sắc và khó dò xét đến tận cùng bản chất." },
+  { word: "vi diệu", hint: "Màu nhiệm, tinh tế và huyền bí khó giải thích." },
+  { word: "kiên định", hint: "Vững vàng không lay chuyển trước mọi khó khăn." },
+  { word: "hoài bão", hint: "Khát vọng lớn lao muốn vươn tới trong cuộc đời." },
+  { word: "nghiệt duyên", hint: "Mối lương duyên trắc trở, oan trái và đau buồn." },
+  { word: "tao nhã", hint: "Thanh lịch, trang nhã và đượm chất nghệ thuật." },
+  { word: "cố chấp", hint: "Khư khư giữ lấy định kiến, không chịu lắng nghe." },
+  { word: "ảo vọng", hint: "Hy vọng hão huyền vào những điều không có thật." },
+  { word: "tuyệt mỹ", hint: "Vẻ đẹp hoàn hảo, tinh tế không tì vết." },
+  { word: "chính trực", hint: "Ngay thẳng, công minh và không tư lợi cá nhân." },
+  { word: "nghịch cảnh", hint: "Hoàn cảnh trớ trêu, trắc trở và đầy gian nan." },
+  { word: "huyết mạch", hint: "Mạch máu cốt lõi truyền đời của dòng giống." },
+  { word: "thiên lương", hint: "Bản tính lương thiện trời phú trong tâm hồn." },
+  { word: "hóa thạch", hint: "Di tích sinh vật cổ xưa biến thành đá qua hàng triệu năm." },
 
-  // Đời sống & Con người
-  "gia đình", "bạn bè", "thầy cô", "mái trường", "quê hương",
-  "đất nước", "con người", "sức khỏe", "tuổi trẻ", "thanh xuân",
-  "ước mơ", "hoài bão", "nụ cười", "ánh mắt", "kỷ luật",
-  "văn hóa", "truyền thống", "lịch sử", "văn học", "âm nhạc",
-  "hội họa", "nhiếp ảnh", "điện ảnh", "du lịch", "khám phá",
-  "trải nghiệm", "thực tế", "đổi mới", "chiến lược", "kế hoạch",
-
-  // Xã hội & Công nghệ
-  "phát minh", "công nghệ", "nghiên cứu", "kỹ thuật", "khoa học",
-  "giáo dục", "học tập", "tài năng", "sản xuất", "kinh doanh",
-  "đầu tư", "hợp tác", "giao tiếp", "lãnh đạo", "quản lý",
-  "mục tiêu", "thành tựu", "bứt phá", "cơ hội", "tiềm năng",
-  "giá trị", "sứ mệnh", "tầm nhìn", "hiệu quả", "văn minh",
-
-  // Cuộc sống hàng ngày & Vật thể
-  "bức tranh", "cuốn sách", "cây đàn", "bàn học", "chiếc xe",
-  "con đường", "góc phố", "tiệm trà", "bữa cơm", "mái nhà",
-  "khung hình", "trang sách", "giai điệu", "vần thơ", "câu chuyện",
-  "lời ca", "tiếng cười", "kỷ vật", "chiếc lá", "bông hoa",
-  "ngọn nến", "hơi thở", "nhịp đập", "giấc mơ", "ánh sáng",
-  "bóng râm", "bình hoa", "ấm trà", "đồng hồ", "chuyến đi"
+  // Thiên nhiên & Hiện tượng kỳ thú
+  { word: "nguyệt thực", hint: "Hiện tượng thiên văn khi Mặt Trăng đi vào vùng bóng Trái Đất." },
+  { word: "nhật thực", hint: "Hiện tượng thiên văn khi Mặt Trời bị Mặt Trăng che khuất." },
+  { word: "tinh vân", hint: "Đám mây bụi khí khổng lồ phát sáng lộng lẫy ngoài vũ trụ." },
+  { word: "băng đăng", hint: "Tác phẩm điêu khắc nghệ thuật tinh xảo từ khối băng tuyết." },
+  { word: "thủy triều", hint: "Hiện tượng nước biển dâng lên và hạ xuống tuần hoàn theo chu kỳ." },
+  { word: "bão cát", hint: "Cơn lốc cuộn tung cát bụi mù trời nơi sa mạc khô hạn." },
+  { word: "hỏa hoạn", hint: "Thảm họa cháy dữ dội gây tổn thất to lớn." },
+  { word: "hắc ám", hint: "Bóng tối bao trùm u ám, lạnh lẽo và đáng sợ." },
+  { word: "huyễn cảnh", hint: "Cảnh tượng hư ảo, đẹp lung linh tựa như trong cõi mộng." },
+  { word: "hoàng hôn", hint: "Khoảnh khắc cuối ngày khi vầng dương chìm dần vào bóng tối." },
+  { word: "bình minh", hint: "Thời khắc những tia nắng đầu ngày hé rạng xua tan đêm đen." },
+  { word: "sơn hà", hint: "Núi sông gấm vóc, bờ cõi thiêng liêng của một đất nước." },
+  { word: "địa cầu", hint: "Hành tinh xanh bao la nơi muôn loài cùng sinh sôi." },
+  { word: "thác đổ", hint: "Dòng nước lao dốc từ vách núi cao tung bọt trắng xóa." },
+  { word: "phù sa", hint: "Lớp đất màu mỡ lắng đọng bồi đắp đôi bờ sông lớn." }
 ];
 
 /**
@@ -249,20 +277,33 @@ function scramblePhrase(text) {
  */
 async function generateWordWithAI() {
   const TOPICS = [
-    "Thiên nhiên", "Đời sống", "Tri thức", "Tình cảm", "Cảm xúc",
-    "Ý chí", "Nghệ thuật", "Thể thao", "Xã hội", "Gia đình", "Học tập",
-    "Khoa học", "Văn hóa", "Vũ trụ", "Công nghệ", "Âm nhạc", "Văn học"
+    "Từ láy tượng hình / tượng thanh đặc sắc",
+    "Tâm trạng & Cảm xúc sâu sắc",
+    "Từ Hán - Việt uyên bác & thâm thúy",
+    "Phẩm chất, Ý chí & Khí phách can trường",
+    "Thiên nhiên hùng vĩ & Hiện tượng bí ẩn",
+    "Triết lý, Đời sống & Nhân sinh quan",
+    "Nghệ thuật, Văn học & Ngôn từ tao nhã",
+    "Khái niệm trừu tượng & Không gian thời gian"
   ];
   const randomTopic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
 
-  const prompt = `Bạn là Trò chơi Sắp Xếp Từ Tiếng Việt.
-Hãy tạo ngẫu nhiên 1 cụm từ tiếng Việt 2 tiếng thuộc chủ đề "${randomTopic}" có nghĩa, phổ biến, nghiêm túc.
-Kèm theo 1 gợi ý ngắn 3-5 từ về chủ đề đó.
+  const prompt = `Bạn là Trọng tài Trò chơi Sắp Xếp Từ Tiếng Việt cấp độ Thử Thách Trí Tuệ (Intermediate - Hard).
+Nhiệm vụ của bạn là tạo ngẫu nhiên 1 cụm từ tiếng Việt 2 tiếng thuộc chủ đề: "${randomTopic}".
+
+YÊU CẦU ĐỘ KHÓ & TỪ VỰNG:
+1. Cụm từ BẮT BUỘC có đúng 2 tiếng (2 từ đơn ghép lại).
+2. TỪ VỰNG PHẢI ĐẶC SẮC, GIÀU TÍNH THỬ THÁCH, CẤU TRÚC PHỨC TẠP:
+   - Ưu tiên từ láy giàu hình tượng hoặc cảm xúc (ví dụ: "khắc khoải", "bàng hoàng", "chông chênh", "quạnh quẽ", "xao xuyến", "thao thức", "nghiệt ngã", "huyễn hoặc", "chập chùng", "rạo rực", "liêu xiêu", "lênh đênh", "bâng khuâng", "hoang hoải").
+   - Hoặc từ Hán-Việt thâm thúy, tinh tế (ví dụ: "uyên bác", "khảng khái", "phù phiếm", "tịch mịch", "trầm mặc", "can trường", "kiên định", "bất khuất", "mẫn tiệp", "ngạo nghễ", "tiêu dao", "huyên náo", "thâm sâu").
+   - Hoặc hiện tượng tự nhiên/khái niệm kỳ thú (ví dụ: "nguyệt thực", "nhật thực", "tinh vân", "thủy triều", "băng đăng", "hóa thạch", "huyễn cảnh").
+3. TUYỆT ĐỐI KHÔNG chọn các từ quá đơn giản, phổ thông hàng ngày như: "cây cối", "học tập", "gia đình", "bàn học", "sách vở", "bữa cơm", "bình an", "vui vẻ".
+4. Gợi ý (hint) PHẢI LÀ 1 CÂU GIẢI NGHĨA TỪ ĐIỂN HOẶC CÂU ĐỐ NGHĨA BÓNG NGẮN GỌN (khoảng 8-15 từ), KHÔNG ĐƯỢC nói toẹt tên chủ đề hay nhắc đến các chữ cái trong từ!
 
 Bắt buộc trả về đúng định dạng JSON:
 {
-  "word": "cụm từ 2 tiếng",
-  "hint": "Gợi ý chủ đề ngắn"
+  "word": "cụm từ 2 tiếng độ khó cao",
+  "hint": "Câu giải nghĩa ẩn dụ hoặc định nghĩa ngắn gọn"
 }`;
 
   try {
@@ -290,15 +331,15 @@ Bắt buộc trả về đúng định dạng JSON:
   }
 
   // Backup fallback with random selection from unused pool
-  const unusedBackups = BACKUP_WORDS.filter(w => !usedScrambleWords.has(w));
-  const pool = unusedBackups.length > 0 ? unusedBackups : BACKUP_WORDS;
-  const randomWord = pool[Math.floor(Math.random() * pool.length)];
-  usedScrambleWords.add(randomWord);
+  const unusedBackups = BACKUP_CHALLENGES.filter(c => !usedScrambleWords.has(c.word));
+  const pool = unusedBackups.length > 0 ? unusedBackups : BACKUP_CHALLENGES;
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  usedScrambleWords.add(picked.word);
   if (usedScrambleWords.size > 500) usedScrambleWords.clear();
 
   return {
-    word: randomWord,
-    hint: "Cụm từ tiếng Việt thông dụng"
+    word: picked.word,
+    hint: picked.hint
   };
 }
 
