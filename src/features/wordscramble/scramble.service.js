@@ -3,10 +3,12 @@ const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
 const LeaderboardModel = require("../../database/models/Leaderboard");
+const ActiveGameStateModel = require("../../database/models/ActiveGameState");
 const { callGeminiApi } = require("../wordchain/aiValidator.service");
 const { normalize } = require("../../utils/textUtils");
 
 const SCRAMBLE_DATA_FILE = path.join(__dirname, "../../data/leaderboard_scramble.json");
+const ACTIVE_SCRAMBLE_FILE = path.join(__dirname, "../../data/active_scramble.json");
 
 /**
  * Load scramble leaderboard from file
@@ -54,6 +56,132 @@ let scrambleState = {
   startTime: null,
   scores: loadScrambleScores(),
 };
+
+/**
+ * Serialize scramble state for MongoDB / JSON file storage
+ */
+function serializeScrambleState(state) {
+  if (!state) return null;
+  return {
+    active: state.active,
+    originalWord: state.originalWord,
+    scrambledText: state.scrambledText,
+    hintText: state.hintText,
+    startTime: state.startTime,
+  };
+}
+
+/**
+ * Save active scramble state to MongoDB Atlas and local backup file
+ */
+async function saveActiveScrambleState(isActive = true) {
+  try {
+    const serialized = serializeScrambleState(scrambleState);
+    const active = Boolean(isActive && scrambleState.active && scrambleState.originalWord);
+    serialized.active = active;
+
+    // 1. Save to local JSON backup
+    try {
+      const dir = path.dirname(ACTIVE_SCRAMBLE_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        ACTIVE_SCRAMBLE_FILE,
+        JSON.stringify({ active, data: serialized, lastUpdated: new Date() }, null, 2),
+        "utf-8"
+      );
+    } catch (fsErr) {
+      console.error("❌ Error saving local active scramble file:", fsErr.message);
+    }
+
+    // 2. Save to MongoDB Atlas Database
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      await ActiveGameStateModel.findOneAndUpdate(
+        { gameId: "wordscramble" },
+        {
+          active,
+          data: serialized,
+          lastUpdated: new Date(),
+        },
+        { upsert: true, returnDocument: "after" }
+      ).catch((dbErr) => console.error("❌ Error saving active scramble state to DB:", dbErr.message));
+    }
+  } catch (err) {
+    console.error("❌ Error in saveActiveScrambleState:", err.message);
+  }
+}
+
+/**
+ * Restore active scramble state from MongoDB Atlas or local JSON file upon bot restart
+ * @param {import("discord.js").TextBasedChannel} [scrambleChannel]
+ * @returns {Promise<{restored: boolean, state: object|null}>}
+ */
+async function restoreScrambleState(scrambleChannel = null) {
+  try {
+    let savedData = null;
+
+    // 1. Try to load from MongoDB Atlas first
+    if (mongoose.connection && mongoose.connection.readyState === 1) {
+      try {
+        const doc = await ActiveGameStateModel.findOne({ gameId: "wordscramble" }).lean();
+        if (doc && doc.active && doc.data && doc.data.originalWord) {
+          savedData = doc.data;
+        }
+      } catch (dbErr) {
+        console.warn("⚠️ Cannot read scramble state from MongoDB:", dbErr.message);
+      }
+    }
+
+    // 2. Fallback to local JSON file if DB has nothing
+    if (!savedData && fs.existsSync(ACTIVE_SCRAMBLE_FILE)) {
+      try {
+        const raw = fs.readFileSync(ACTIVE_SCRAMBLE_FILE, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.active && parsed.data && parsed.data.originalWord) {
+          savedData = parsed.data;
+        }
+      } catch (fileErr) {
+        console.warn("⚠️ Cannot read local active scramble file:", fileErr.message);
+      }
+    }
+
+    // 3. Cross-check with recent messages in scrambleChannel
+    if (scrambleChannel && scrambleChannel.isTextBased()) {
+      try {
+        const messages = await scrambleChannel.messages.fetch({ limit: 5 }).catch(() => null);
+        if (messages && messages.size > 0) {
+          const recentArr = Array.from(messages.values());
+          const lastMsg = recentArr[0];
+
+          // If the last message is a win message, then this puzzle was already solved!
+          if (lastMsg.content && lastMsg.content.includes("đã xuất sắc giải đáp chính xác")) {
+            console.log("ℹ️ Câu đố Sắp Xếp Từ trước đã được giải đáp, sẽ tạo câu đố mới.");
+            return { restored: false, state: null };
+          }
+        }
+      } catch (chanErr) {
+        console.warn("⚠️ Warning checking channel messages for WordScramble:", chanErr.message);
+      }
+    }
+
+    if (savedData && savedData.originalWord && savedData.scrambledText) {
+      scrambleState.active = true;
+      scrambleState.originalWord = savedData.originalWord;
+      scrambleState.scrambledText = savedData.scrambledText;
+      scrambleState.hintText = savedData.hintText || "";
+      scrambleState.startTime = savedData.startTime || Date.now();
+
+      console.log(
+        `🧩 Khôi phục câu đố Sắp Xếp Từ dở dang thành công! Từ gốc: "${scrambleState.originalWord}" (Scrambled: ${scrambleState.scrambledText})`
+      );
+      return { restored: true, state: scrambleState };
+    }
+
+    return { restored: false, state: null };
+  } catch (err) {
+    console.error("❌ Lỗi khi khôi phục Sắp Xếp Từ:", err.message);
+    return { restored: false, state: null };
+  }
+}
 
 // Rich backup pool of 100+ diverse Vietnamese 2-word phrases
 const BACKUP_WORDS = [
@@ -188,6 +316,7 @@ async function startScrambleRound() {
   scrambleState.startTime = Date.now();
 
   console.log(`🧩 AI generated new Scramble word: "${generated.word}" (Scrambled: ${scrambled})`);
+  saveActiveScrambleState(true);
 
   return {
     originalWord: generated.word,
@@ -262,6 +391,9 @@ function recordScrambleWin(userId, username) {
     ).catch(err => console.error("❌ Error updating MongoDB Atlas scramble leaderboard:", err.message));
   }
 
+  // 3. Mark active scramble state as solved/inactive
+  saveActiveScrambleState(false);
+
   return currentData.wins;
 }
 
@@ -284,4 +416,5 @@ module.exports = {
   recordScrambleWin,
   getScrambleLeaderboard,
   getScrambleState,
+  restoreScrambleState,
 };

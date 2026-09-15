@@ -30,10 +30,10 @@ const { connectDatabase } = require("./src/database/mongoose");
 const LeaderboardModel = require("./src/database/models/Leaderboard");
 
 // Word Chain & Word Scramble Features
-const { onWordChainMessage } = require("./src/features/wordchain/messageHandler");
+const { onWordChainMessage, scheduleBotTurn } = require("./src/features/wordchain/messageHandler");
 const { onWordScrambleMessage } = require("./src/features/wordscramble/messageHandler");
-const { startGame, getWordChainScoresMap } = require("./src/features/wordchain/game.service");
-const { startScrambleRound, getScrambleState } = require("./src/features/wordscramble/scramble.service");
+const { startGame, getWordChainScoresMap, restoreWordChainState } = require("./src/features/wordchain/game.service");
+const { startScrambleRound, getScrambleState, restoreScrambleState } = require("./src/features/wordscramble/scramble.service");
 const { createDetailedRulesEmbed } = require("./src/features/wordchain/embedBuilder");
 const { createScrambleChallengeEmbed } = require("./src/features/wordscramble/embedBuilder");
 
@@ -203,32 +203,44 @@ client.once(Events.ClientReady, async () => {
     }
   }
 
-  // Initialize WordChain game
+  // Initialize WordChain game (Khôi phục ván chơi dở dang nếu có)
   try {
     const chainChannel = await client.channels.fetch(WORDCHAIN_CHANNEL_ID).catch(() => null);
-    const startState = startGame(client.user.id, client.user.username);
     if (chainChannel && chainChannel.isTextBased()) {
-      await sendWebhook(
-        "wordchain",
-        {
-          content: `🔄 **MINIGAME NỐI TỪ ĐÃ SẴN SÀNG!**\nTừ mở màn: **${startState.currentWord}**\n👉 Hãy nối tiếp từ 2 tiếng bắt đầu bằng chữ: **"${startState.expectedKey}"**!`
-        },
-        chainChannel
-      );
+      const { restored, state } = await restoreWordChainState(chainChannel);
+      if (restored && state) {
+        console.log(`🔤 Minigame Nối Từ: Đã khôi phục ván dở dang "${state.currentWord}" (chờ chữ "${state.expectedKey}") tại kênh <#${WORDCHAIN_CHANNEL_ID}>`);
+        // Khởi động lại bộ đếm tiếp chiêu nếu người chơi không ai nối
+        scheduleBotTurn(client, chainChannel, null, 180);
+      } else {
+        const startState = startGame(client.user.id, client.user.username);
+        await sendWebhook(
+          "wordchain",
+          {
+            content: `🔄 **MINIGAME NỐI TỪ ĐÃ SẴN SÀNG!**\nTừ mở màn: **${startState.currentWord}**\n👉 Hãy nối tiếp từ 2 tiếng bắt đầu bằng chữ: **"${startState.expectedKey}"**!`
+          },
+          chainChannel
+        );
+        console.log(`🔤 Minigame Nối Từ đã sẵn sàng (ván mới) tại kênh <#${WORDCHAIN_CHANNEL_ID}>`);
+      }
     }
-    console.log(`🔤 Minigame Nối Từ đã sẵn sàng tại kênh <#${WORDCHAIN_CHANNEL_ID}>`);
   } catch (err) {
     console.error("❌ Lỗi khởi tạo WordChain:", err.message);
   }
 
-  // Initialize WordScramble game
+  // Initialize WordScramble game (Khôi phục câu đố dở dang nếu chưa ai giải)
   try {
     const scrambleChannel = await client.channels.fetch(WORDSCRAMBLE_CHANNEL_ID).catch(() => null);
     if (scrambleChannel && scrambleChannel.isTextBased()) {
-      const round = await startScrambleRound();
-      const embed = createScrambleChallengeEmbed(round.scrambledText, round.hintText);
-      await sendWebhook("wordscramble", { embeds: [embed] }, scrambleChannel);
-      console.log(`🧩 Minigame Sắp Xếp Từ đã kích hoạt tại kênh <#${WORDSCRAMBLE_CHANNEL_ID}>`);
+      const { restored, state } = await restoreScrambleState(scrambleChannel);
+      if (restored && state) {
+        console.log(`🧩 Minigame Sắp Xếp Từ: Đã khôi phục câu đố dở dang "${state.originalWord}" tại kênh <#${WORDSCRAMBLE_CHANNEL_ID}>`);
+      } else {
+        const round = await startScrambleRound();
+        const embed = createScrambleChallengeEmbed(round.scrambledText, round.hintText);
+        await sendWebhook("wordscramble", { embeds: [embed] }, scrambleChannel);
+        console.log(`🧩 Minigame Sắp Xếp Từ đã kích hoạt (câu đố mới) tại kênh <#${WORDSCRAMBLE_CHANNEL_ID}>`);
+      }
     }
   } catch (err) {
     console.error("❌ Lỗi khởi tạo WordScramble:", err.message);

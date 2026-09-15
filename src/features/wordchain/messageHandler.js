@@ -338,4 +338,5 @@ function onWordChainMessage(client) {
 
 module.exports = {
   onWordChainMessage,
+  scheduleBotTurn,
 };
