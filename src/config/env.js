@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { ADMIN_IDS: DEFAULT_ADMIN_IDS, CHANNELS, ROLES, EMOJIS } = require("./ids");
+const { ADMIN_IDS: DEFAULT_ADMIN_IDS, CHANNELS, ROLES, EMOJIS, MUSIC_BOT_ID: DEFAULT_MUSIC_BOT_ID } = require("./ids");
 
 const STAFF_CHANNEL = process.env.STAFF_CHANNEL_ID || "1447095306079698984";
 
@@ -61,6 +61,10 @@ module.exports = {
   // 24/7 Smart Voice Room Keeper
   KEEP_VOICE_CHANNEL_ID: process.env.KEEP_VOICE_CHANNEL_ID || "1389843439851671624",
   ENABLE_VOICE_KEEPER: process.env.ENABLE_VOICE_KEEPER !== "false",
+  MUSIC_BOT_IDS: (process.env.MUSIC_BOT_IDS || process.env.MUSIC_BOT_ID || DEFAULT_MUSIC_BOT_ID || "1542863465335492640")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean),
 
   // Gemini config (Model: gemini-3.1-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(",").map((k) => k.trim()).filter(Boolean),

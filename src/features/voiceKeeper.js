@@ -10,6 +10,7 @@ const {
   KEEP_VOICE_CHANNEL_ID,
   ENABLE_VOICE_KEEPER,
   ALLOWED_GUILD_IDS,
+  MUSIC_BOT_IDS,
 } = require("../config/env");
 
 let currentConnection = null;
@@ -22,6 +23,8 @@ const status = {
   targetChannelId: KEEP_VOICE_CHANNEL_ID,
   channelName: "N/A",
   humanCount: 0,
+  hasMusicBot: false,
+  shouldHoldRoom: false,
   isHolding: false,
   lastEvaluatedAt: null,
   lastConnectedAt: null,
@@ -69,20 +72,41 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
     // Filter humans (non-bot members) in the voice channel
     const humanMembers = channel.members.filter((member) => !member.user.bot);
     const humanCount = humanMembers.size;
+
+    // Check if Music Bot (Anna Music) is currently in the channel
+    const monitoredMusicBots = (MUSIC_BOT_IDS && MUSIC_BOT_IDS.length > 0)
+      ? MUSIC_BOT_IDS
+      : ["1542863465335492640"];
+    const hasMusicBot = channel.members.some((member) => monitoredMusicBots.includes(member.id));
+
+    // =========================================================================
+    // QUY TẮC BẢO VỆ PHÒNG (AVOID ROOM RESET):
+    // 1. Nếu KHÔNG CÓ Bot Nhạc (!hasMusicBot):
+    //    Bot phụ PHẢI LUÔN Ở TRONG PHÒNG giữ chỗ (bất kể có bao nhiêu người thật).
+    // 2. Nếu CÓ Bot Nhạc (hasMusicBot):
+    //    - humanCount <= 1 (0 hoặc 1 người): Bot phụ VẪN Ở TRONG PHÒNG cùng bot nhạc
+    //      để nếu người này out hoặc bot nhạc bị dis thì phòng không bao giờ rơi về 0 thành viên.
+    //    - humanCount >= 2: Đã có đủ ít nhất 2 người thật + bot nhạc -> Bot phụ rời phòng nhường chỗ!
+    // -> Điều kiện giữ phòng: shouldHoldRoom = !hasMusicBot || humanCount < 2;
+    // =========================================================================
+    const shouldHoldRoom = !hasMusicBot || humanCount < 2;
+
     status.humanCount = humanCount;
+    status.hasMusicBot = hasMusicBot;
+    status.shouldHoldRoom = shouldHoldRoom;
     status.lastEvaluatedAt = new Date().toISOString();
     status.lastActionReason = reason;
 
     const botIsInside = channel.members.has(guild.client.user.id);
 
     // =========================================================================
-    // CASE 1: ROOM HAS NO HUMAN MEMBERS (humanCount === 0)
-    // -> Bot phụ tự động vào phòng ngồi chung / giữ phòng (tắt mic, tắt loa)
+    // CASE 1: CẦN GIỮ PHÒNG (shouldHoldRoom === true)
+    // -> Bot phụ kết nối hoặc duy trì ở trong phòng (Self-Deaf & Self-Mute)
     // =========================================================================
-    if (humanCount === 0) {
+    if (shouldHoldRoom) {
       if (!botIsInside && !isJoining) {
         console.log(
-          `[VoiceKeeper] 🛡️ Phòng "${channel.name}" không có người thật (humans: 0). Bot phụ bắt đầu vào giữ phòng... (Lý do: ${reason})`
+          `[VoiceKeeper] 🛡️ Cần giữ phòng "${channel.name}" (humans: ${humanCount}, musicBot: ${hasMusicBot ? "Có" : "Không"}). Bot phụ bắt đầu kết nối... (Lý do: ${reason})`
         );
         isJoining = true;
         status.state = "connecting";
@@ -109,7 +133,7 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
             status.lastConnectedAt = new Date().toISOString();
             status.lastError = null;
             console.log(
-              `[VoiceKeeper] 🟢 Đã kết nối vào "${channel.name}" thành công! Đang giữ phòng (Self-Deaf & Self-Mute).`
+              `[VoiceKeeper] 🟢 Đã kết nối vào "${channel.name}" thành công! Đang giữ phòng (Self-Deaf & Self-Mute, humans: ${status.humanCount}, musicBot: ${status.hasMusicBot ? "Có" : "Không"}).`
             );
           });
 
@@ -129,7 +153,7 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
               status.isHolding = false;
               isJoining = false;
 
-              // Retry after 3 seconds if room is still empty
+              // Retry after 3 seconds if room still needs holding
               setTimeout(() => {
                 evaluateVoiceRoom(guild, "reconnect_after_disconnect");
               }, 3000);
@@ -155,13 +179,13 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
     }
 
     // =========================================================================
-    // CASE 2: ROOM HAS HUMAN MEMBERS (humanCount > 0)
-    // -> Người thật đang ở trong phòng, bot phụ tự động rời đi nhường chỗ
+    // CASE 2: KHÔNG CẦN GIỮ PHÒNG (shouldHoldRoom === false)
+    // -> Đã có Bot Nhạc + từ 2 người thật trở lên, bot phụ rời đi nhường chỗ
     // =========================================================================
     else {
       if (botIsInside || currentConnection) {
         console.log(
-          `[VoiceKeeper] 👋 Phát hiện có ${humanCount} người thật trong phòng "${channel.name}". Bot phụ rời phòng nhường chỗ!`
+          `[VoiceKeeper] 👋 Phòng "${channel.name}" đã an toàn (có Bot Nhạc + ${humanCount} người thật >= 2). Bot phụ rời phòng nhường chỗ!`
         );
 
         if (currentConnection) {
@@ -241,14 +265,20 @@ function initVoiceKeeper(client) {
 
     if (!isTargetChannel) return;
 
-    // Debounce 1.5 seconds to handle quick joins/leaves
+    // Kiểm tra loại sự kiện: Nếu có ai đó (người hoặc bot nhạc) rời khỏi phòng mục tiêu
+    // -> Cần phản ứng nhanh (600ms) để giữ phòng kịp thời, không bị hở thời gian
+    const isLeaveEvent =
+      oldState.channelId === KEEP_VOICE_CHANNEL_ID &&
+      newState.channelId !== KEEP_VOICE_CHANNEL_ID;
+    const debounceMs = isLeaveEvent ? 600 : 1200;
+
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       const guild = newState.guild || oldState.guild || (await getTargetGuild());
       if (guild) {
-        await evaluateVoiceRoom(guild, "voice_state_update");
+        await evaluateVoiceRoom(guild, `voice_state_update:${isLeaveEvent ? "member_left" : "state_changed"}`);
       }
-    }, 1500);
+    }, debounceMs);
   });
 
   // 3. Periodic sanity check every 3 minutes (in case an event was missed)

@@ -7,6 +7,9 @@ module.exports = {
     process.env.ADMIN_ID || "875358286487097395", // Duy Ngựa
   ],
 
+  // ID Bot Nhạc chính thức (Anna Music)
+  MUSIC_BOT_ID: process.env.MUSIC_BOT_ID || "1542863465335492640",
+
   // ID các Kênh Discord (Channels)
   CHANNELS: {
     WORDCHAIN: process.env.WORDCHAIN_CHANNEL_ID || "1450065511231520778", // Kênh game Nối Từ
