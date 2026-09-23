@@ -5,13 +5,53 @@ const {
   entersState,
   getVoiceConnection,
 } = require("@discordjs/voice");
-const { Events } = require("discord.js");
+const { Events, EmbedBuilder } = require("discord.js");
 const {
   KEEP_VOICE_CHANNEL_ID,
   ENABLE_VOICE_KEEPER,
   ALLOWED_GUILD_IDS,
   MUSIC_BOT_IDS,
 } = require("../config/env");
+
+const ROOM_LOG_CHANNEL_ID = process.env.ROOM_LOG_CHANNEL_ID || "1543841691541180546";
+
+/**
+ * Sends a rich, silent embed log to Discord room log channel
+ */
+async function sendKeeperDiscordLog(guild, { title, desc, color, fields = [] }) {
+  try {
+    if (!guild || !ROOM_LOG_CHANNEL_ID) return;
+    const logChannel =
+      guild.channels.cache.get(ROOM_LOG_CHANNEL_ID) ||
+      (await guild.channels.fetch(ROOM_LOG_CHANNEL_ID).catch(() => null));
+
+    if (!logChannel || !logChannel.isTextBased()) return;
+
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const timeFull = `<t:${nowUnix}:F> (<t:${nowUnix}:R>)`;
+
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setTitle(title)
+      .setTimestamp();
+
+    let fullDesc = `⏰ **Thời gian:** ${timeFull}\n`;
+    fullDesc += `📌 **Sự kiện:** ${desc}\n`;
+    if (fields.length > 0) {
+      fullDesc += `\n` + fields.join('\n');
+    }
+
+    embed.setDescription(fullDesc);
+
+    await logChannel.send({
+      embeds: [embed],
+      flags: 4096,
+      allowedMentions: { parse: [] },
+    }).catch(() => {});
+  } catch (err) {
+    // Không làm gián đoạn bot
+  }
+}
 
 let currentConnection = null;
 let debounceTimer = null;
@@ -135,6 +175,18 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
             console.log(
               `[VoiceKeeper] 🟢 Đã kết nối vào "${channel.name}" thành công! Đang giữ phòng (Self-Deaf & Self-Mute, humans: ${status.humanCount}, musicBot: ${status.hasMusicBot ? "Có" : "Không"}).`
             );
+
+            sendKeeperDiscordLog(guild, {
+              title: "🛡️ [Voice Keeper] Bot Phụ Vào Giữ Phòng",
+              desc: `Bot phụ đã kết nối vào phòng <#${channel.id}> để giữ phòng tránh reset thời gian`,
+              color: 0x57F287,
+              fields: [
+                `👥 **Số người thật trong phòng:** \`${status.humanCount}\``,
+                `🤖 **Bot Nhạc (Anna Music):** ${status.hasMusicBot ? "✅ Đang ở trong phòng" : "❌ Chưa có / Bị dis"}`,
+                `⚡ **Lý do kích hoạt:** \`${reason}\``,
+                `🔒 **Trạng thái:** Tắt Mic & Điếc Tai (Self-Deaf & Self-Mute)`
+              ]
+            });
           });
 
           currentConnection.on(VoiceConnectionStatus.Disconnected, async () => {
@@ -152,6 +204,16 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
               status.state = "disconnected";
               status.isHolding = false;
               isJoining = false;
+
+              sendKeeperDiscordLog(guild, {
+                title: "⚠️ [Voice Keeper] Mất Kết Nối Voice",
+                desc: `Bot phụ bị mất kết nối khỏi phòng <#${channel.id}>, đang tự động dọn dẹp để kết nối lại...`,
+                color: 0xED4245,
+                fields: [
+                  `👥 **Số người thật lúc rớt:** \`${status.humanCount}\``,
+                  `🤖 **Bot Nhạc:** ${status.hasMusicBot ? "✅ Có" : "❌ Không"}`
+                ]
+              });
 
               // Retry after 3 seconds if room still needs holding
               setTimeout(() => {
@@ -187,6 +249,17 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
         console.log(
           `[VoiceKeeper] 👋 Phòng "${channel.name}" đã an toàn (có Bot Nhạc + ${humanCount} người thật >= 2). Bot phụ rời phòng nhường chỗ!`
         );
+
+        sendKeeperDiscordLog(guild, {
+          title: "👋 [Voice Keeper] Bot Phụ Rời Phòng (Nhường Chỗ)",
+          desc: `Phòng <#${channel.id}> đã an toàn, bot phụ chủ động rời phòng nhường chỗ`,
+          color: 0xFEE75C,
+          fields: [
+            `👥 **Số người thật trong phòng:** \`${humanCount}\` (>= 2 người)`,
+            `🤖 **Bot Nhạc (Anna Music):** ✅ Đang ở trong phòng`,
+            `🛡️ **Trạng thái:** Phòng an toàn tuyệt đối, không lo bị reset thời gian.`
+          ]
+        });
 
         if (currentConnection) {
           try {
