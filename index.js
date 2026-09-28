@@ -73,38 +73,15 @@ function formatUptime(seconds) {
   return parts.join(" ");
 }
 
-function getMemoryStats() {
-  const mem = process.memoryUsage();
-  const toMB = (bytes) => `${Math.round((bytes / 1024 / 1024) * 10) / 10} MB`;
-  const rssMB = Math.round(mem.rss / 1024 / 1024);
-  return {
-    rss: toMB(mem.rss),
-    heapUsed: toMB(mem.heapUsed),
-    heapTotal: toMB(mem.heapTotal),
-    renderLimit: "512 MB",
-    percentOf512MB: `${Math.round((rssMB / 512) * 1000) / 10}%`,
-  };
-}
+
 
 app.get("/", (req, res) => {
   res.json({
     status: "online",
     botName: "Anna Bot (Minigames, WuWa & Voice Keeper)",
     isReady: client ? client.isReady() : false,
-    mode: IS_TEST_MODE ? "TEST_MODE" : "PRODUCTION_MODE",
-    ping: client && client.ws ? `${client.ws.ping}ms` : "N/A",
     uptime: formatUptime(process.uptime()),
-    memory: getMemoryStats(),
-    voiceKeeper: getVoiceKeeperStatus(),
-    channels: {
-      wordchain: WORDCHAIN_CHANNEL_ID,
-      wordscramble: WORDSCRAMBLE_CHANNEL_ID,
-      wuwaCodes: WUWA_CODES_CHANNEL_ID,
-      rules: RULES_CHANNEL_ID,
-      voiceKeeperRoom: KEEP_VOICE_CHANNEL_ID,
-    },
-    prodChannels: PROD_CHANNELS,
-    testChannels: TEST_CHANNELS,
+    ping: client && client.ws ? `${client.ws.ping}ms` : "N/A",
   });
 });
 

@@ -14,10 +14,16 @@ const {
 const { applySmartMoveReaction } = require("../../utils/emojiManager");
 const { checkVulgarAndMute } = require("../../utils/moderation");
 const { sendWebhook } = require("../../utils/webhook.service");
-const { WORDSCRAMBLE_CHANNEL_ID } = require("../../config/env");
+const { WORDSCRAMBLE_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
+
+const isAdmin = (userId) => (ADMIN_IDS && ADMIN_IDS.length > 0) ? ADMIN_IDS.includes(userId) : userId === ADMIN_ID;
 
 // Track processed guess messages
 const processingScramble = new Set();
+
+// Hint cooldown map: Map<userId, timestamp>
+const scrambleHintCooldowns = new Map();
+const SCRAMBLE_HINT_COOLDOWN_MS = 60000; // 60 giây Cooldown chống spam
 
 /**
  * Handle messages for Word Scramble Game
@@ -61,7 +67,31 @@ function onWordScrambleMessage(client) {
       return;
     }
 
-    // Lệnh !goiy / !goiy_sapxep: Gợi ý chữ cái đầu tiên
+    // Lệnh !skip / !boqua: Bỏ qua câu đố khó (Chỉ dành cho Admin)
+    if (rawContent === "!skip" || rawContent === "!boqua" || rawContent === "!bỏ qua") {
+      if (!isAdmin(message.author.id)) {
+        await message.reply("⛔ Chỉ Quản trị viên (Admin) mới có quyền bỏ qua câu đố!").catch(() => {});
+        return;
+      }
+      if (!state.active || !state.originalWord) {
+        await message.reply("✨ Hiện không có ván chơi nào đang diễn ra!").catch(() => {});
+        return;
+      }
+      const skippedWord = state.originalWord;
+      const nextRound = await startScrambleRound();
+      const nextEmbed = createScrambleChallengeEmbed(nextRound.scrambledText);
+      await sendWebhook(
+        webhookUrl || "wordscramble",
+        {
+          content: `⏩ Admin <@${message.author.id}> đã bỏ qua câu đố! Đáp án của từ vừa rồi là: **"${skippedWord}"**.\n👉 Đã chuyển sang câu đố mới:`,
+          embeds: [nextEmbed],
+        },
+        message.channel
+      );
+      return;
+    }
+
+    // Lệnh !goiy / !goiy_sapxep: Gợi ý chữ cái đầu tiên (Có Cooldown 60s)
     if (
       rawContent === "!goiy" ||
       rawContent === "!gợi ý" ||
@@ -77,6 +107,16 @@ function onWordScrambleMessage(client) {
         );
         return;
       }
+
+      const now = Date.now();
+      const lastHintTime = scrambleHintCooldowns.get(message.author.id) || 0;
+      if (now - lastHintTime < SCRAMBLE_HINT_COOLDOWN_MS) {
+        const remainingSec = Math.ceil((SCRAMBLE_HINT_COOLDOWN_MS - (now - lastHintTime)) / 1000);
+        await message.reply(`⏳ Bạn cần chờ **${remainingSec}s** nữa để dùng lại lệnh gợi ý!`).catch(() => {});
+        return;
+      }
+      scrambleHintCooldowns.set(message.author.id, now);
+
       const firstLetter = state.originalWord.charAt(0).toUpperCase();
       await sendWebhook(
         webhookUrl || "wordscramble",
