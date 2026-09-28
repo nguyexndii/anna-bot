@@ -15,7 +15,10 @@ const {
   ALLOWED_GUILD_IDS,
   KEEP_VOICE_CHANNEL_ID,
   ENABLE_VOICE_KEEPER,
+  ADMIN_ID,
 } = require("./src/config/env");
+
+const { initStatusNotifier } = require("./src/utils/statusNotifier");
 
 // 24/7 Smart Voice Room Keeper
 const { initVoiceKeeper, getVoiceKeeperStatus } = require("./src/features/voiceKeeper");
@@ -125,6 +128,12 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildVoiceStates,
   ],
+});
+
+initStatusNotifier(client, {
+  adminId: ADMIN_ID || "875358286487097395",
+  botName: "Anna Bot (Minigames & WuWa)",
+  platform: "Discloud Hosting",
 });
 
 /**
