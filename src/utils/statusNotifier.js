@@ -75,7 +75,7 @@ function initStatusNotifier(client, options = {}) {
   const {
     adminId = "875358286487097395",
     botName = "Anna Bot (Minigames & WuWa)",
-    platform = "Discloud Hosting",
+    platform = "Render Hosting",
   } = options;
 
   let isShuttingDown = false;
