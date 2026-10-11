@@ -109,8 +109,53 @@ async function scrapeFandomWiki() {
   }
 }
 
+const WWPLUS_URL = "https://wwplus.net/tong-hop-code-wuthering-waves-moi-nhat/";
+
 /**
- * Backup Scraper 1: Reddit Community Feed (r/wutheringwavescodes & r/WutheringWaves)
+ * Nguồn 1: WWPlus.net (Cập nhật nhanh nhất tại Việt Nam)
+ */
+async function scrapeWwplus() {
+  try {
+    const response = await axios.get(WWPLUS_URL, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+      timeout: 10000,
+    });
+
+    if (!response.data) return [];
+    const $ = cheerio.load(response.data);
+    const codesList = [];
+
+    $("table.editor-table tr").each((_, tr) => {
+      const btn = $(tr).find("button.editor-giftcode-button");
+      const codeStr = (btn.attr("data-gift-code") || btn.text()).trim().toUpperCase();
+      if (!codeStr) return;
+
+      const tds = $(tr).find("td");
+      const rewardStr = $(tds[1]).text().trim() || "Astrite & Vật phẩm game";
+      const durationStr = $(tds[2]).text().trim() || "Còn hiệu lực";
+
+      codesList.push({
+        code: codeStr,
+        server: "All",
+        rewards: [{ name: rewardStr, quantity: "1", icon: "" }],
+        rewardsText: `• **${rewardStr}**`,
+        duration: durationStr,
+        source: "WWPlus.net",
+      });
+    });
+
+    return codesList;
+  } catch (err) {
+    console.error("⚠️ [Scraper] WWPlus scraper error:", err.message);
+    return [];
+  }
+}
+
+/**
+ * Backup: Reddit Community Feed
  */
 async function scrapeRedditBackup() {
   try {
@@ -148,29 +193,59 @@ async function scrapeRedditBackup() {
     }
     return backupCodes;
   } catch (err) {
-    console.error("⚠️ [Scraper] Reddit backup scraper error:", err.message);
     return [];
   }
 }
 
 /**
- * Main Scrape function with multi-source fallback (Fandom Wiki -> Reddit / Game8 Community)
+ * Main Scrape function with Multi-Source Aggregation (WWPlus.net + Fandom Wiki)
  */
 async function scrapeWuwaCodes() {
-  // 1. Try Primary (Fandom Wiki API)
-  let codes = await scrapeFandomWiki();
+  const results = await Promise.allSettled([
+    scrapeWwplus(),
+    scrapeFandomWiki(),
+  ]);
 
-  if (codes && codes.length > 0) {
-    console.log(`🔍 [Scraper WuWa] Lấy thành công ${codes.length} code từ Nguồn 1 (Fandom Wiki)!`);
-    return codes;
+  const wwplusCodes = results[0].status === "fulfilled" ? results[0].value : [];
+  const fandomCodes = results[1].status === "fulfilled" ? results[1].value : [];
+
+  console.log(`🔍 [Scraper WuWa] Thu thập được ${wwplusCodes.length} code từ WWPlus.net, ${fandomCodes.length} code từ Fandom Wiki.`);
+
+  const mergedMap = new Map();
+
+  // Nạp từ Fandom Wiki
+  for (const c of fandomCodes) {
+    if (c.code) mergedMap.set(c.code.toUpperCase(), c);
   }
 
-  // 2. Fallback to Backup Scraper 1 (Reddit Community / Game8 Feed)
-  console.log("⚠️ [Scraper WuWa] Nguồn chính Fandom không phản hồi, chuyển sang Nguồn dự phòng (Reddit / Game8 Community)...");
-  codes = await scrapeRedditBackup();
+  // Nạp từ WWPlus.net (hợp nhất và bổ sung các code mới nhất)
+  for (const c of wwplusCodes) {
+    const codeKey = c.code.toUpperCase();
+    if (mergedMap.has(codeKey)) {
+      const existing = mergedMap.get(codeKey);
+      mergedMap.set(codeKey, {
+        ...existing,
+        ...c,
+        rewards: (existing.rewards && existing.rewards.length > 0) ? existing.rewards : c.rewards,
+        rewardsText: (existing.rewardsText && existing.rewardsText.includes("• **")) ? existing.rewardsText : c.rewardsText,
+      });
+    } else {
+      mergedMap.set(codeKey, c);
+    }
+  }
 
-  console.log(`🔍 [Scraper WuWa] Lấy thành công ${codes.length} code từ Nguồn dự phòng (Reddit / Game8)!`);
-  return codes;
+  // Fallback qua Reddit nếu cả 2 nguồn trên đều không có dữ liệu
+  if (mergedMap.size === 0) {
+    console.log("⚠️ [Scraper WuWa] Cả 2 nguồn chính đều không có dữ liệu, thử nguồn dự phòng Reddit...");
+    const redditCodes = await scrapeRedditBackup();
+    for (const c of redditCodes) {
+      if (c.code) mergedMap.set(c.code.toUpperCase(), c);
+    }
+  }
+
+  const mergedCodes = Array.from(mergedMap.values());
+  console.log(`✨ [Scraper WuWa] Tổng cộng sau khi hợp nhất: ${mergedCodes.length} code.`);
+  return mergedCodes;
 }
 
-module.exports = { scrapeWuwaCodes };
+module.exports = { scrapeWuwaCodes, scrapeWwplus, scrapeFandomWiki };

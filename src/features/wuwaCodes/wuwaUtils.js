@@ -32,6 +32,17 @@ function parseExpiryDate(durationStr) {
     }
   }
 
+  // Vietnamese Range format (DD/MM - DD/MM or DD/MM/YYYY - DD/MM/YYYY or DD/MM đến DD/MM)
+  const rangeMatch = durationStr.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*[-–—đếnto~]+\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (rangeMatch) {
+    const endDay = parseInt(rangeMatch[4], 10);
+    const endMonthIdx = parseInt(rangeMatch[5], 10) - 1;
+    const currentYear = new Date().getFullYear();
+    const endYear = rangeMatch[6] ? parseInt(rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6], 10) : currentYear;
+
+    return new Date(endYear, endMonthIdx, endDay, 23, 59, 59);
+  }
+
   // Manual Vietnamese format (DD/MM or DD/MM/YYYY)
   const vnMatch = durationStr.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
   if (vnMatch) {
@@ -127,7 +138,19 @@ async function translateDurationToVN(durationStr) {
     return `Hạn dùng: Ngày ${vDay}/${vMonth}/${vYear}`;
   }
 
-  // Pattern 4: Vietnamese manual format e.g. "hạn 11/08" or "hạn 11/08/2026"
+  // Pattern 4: Vietnamese Range format e.g. "11/10 - 13/10"
+  const rangeMatch = durationStr.match(/(?:hạn|han)?\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\s*[-–—đếnto~]+\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
+  if (rangeMatch) {
+    const startDay = rangeMatch[1].padStart(2, "0");
+    const startMonth = rangeMatch[2].padStart(2, "0");
+    const endDay = rangeMatch[4].padStart(2, "0");
+    const endMonth = rangeMatch[5].padStart(2, "0");
+    const currentYear = new Date().getFullYear();
+    const year = rangeMatch[6] ? (rangeMatch[6].length === 2 ? `20${rangeMatch[6]}` : rangeMatch[6]) : currentYear;
+    return `Hạn dùng: ${startDay}/${startMonth} đến ${endDay}/${endMonth}/${year}`;
+  }
+
+  // Pattern 5: Vietnamese manual format e.g. "hạn 11/08" or "hạn 11/08/2026"
   const vnMatch = durationStr.match(/(?:hạn|han|expires?|hết hạn|het han)?\s*(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/i);
   if (vnMatch) {
     const day = vnMatch[1].padStart(2, "0");
