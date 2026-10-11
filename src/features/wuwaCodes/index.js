@@ -51,7 +51,7 @@ async function checkAndNotifyWuwaCodes(client) {
     console.log("🔄 [WuWa Code Watcher] Đang kiểm tra code Wuthering Waves (Web + Thêm thủ công)...");
     
     // 1. Scrape live codes from web (Fandom Wiki / Backup)
-    const webCodes = (await scrapeWuwaCodes()) || [];
+    const webCodes = (await scrapeWuwaCodes(client)) || [];
 
     // 2. Fetch active manual & saved codes from Database
     let dbActiveCodes = [];

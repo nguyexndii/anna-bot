@@ -109,49 +109,148 @@ async function scrapeFandomWiki() {
   }
 }
 
-const WWPLUS_URL = "https://wwplus.net/tong-hop-code-wuthering-waves-moi-nhat/";
+const { ADMIN_ID } = require("../../config/env");
+const { sendAdminDM } = require("../../utils/statusNotifier");
+
+let currentWwplusUrl = "https://wwplus.net/tong-hop-code-wuthering-waves-moi-nhat/";
+let lastWwplusAlertTs = 0;
 
 /**
- * Nguồn 1: WWPlus.net (Cập nhật nhanh nhất tại Việt Nam)
+ * Tự động quét trang chủ wwplus.net để tìm link danh sách code mới nhất nếu URL cũ bị đổi
  */
-async function scrapeWwplus() {
+async function discoverWwplusCodeUrl() {
   try {
-    const response = await axios.get(WWPLUS_URL, {
+    const res = await axios.get("https://wwplus.net/", {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
-      timeout: 10000,
+      timeout: 8000,
+    });
+    if (!res.data) return null;
+    const $ = cheerio.load(res.data);
+    let foundUrl = null;
+
+    $("a[href]").each((_, el) => {
+      const href = $(el).attr("href");
+      const text = $(el).text().trim().toLowerCase();
+      if (href && (href.includes("code") || text.includes("code game") || text.includes("giftcode"))) {
+        if (!foundUrl) foundUrl = href;
+      }
     });
 
-    if (!response.data) return [];
-    const $ = cheerio.load(response.data);
-    const codesList = [];
-
-    $("table.editor-table tr").each((_, tr) => {
-      const btn = $(tr).find("button.editor-giftcode-button");
-      const codeStr = (btn.attr("data-gift-code") || btn.text()).trim().toUpperCase();
-      if (!codeStr) return;
-
-      const tds = $(tr).find("td");
-      const rewardStr = $(tds[1]).text().trim() || "Astrite & Vật phẩm game";
-      const durationStr = $(tds[2]).text().trim() || "Còn hiệu lực";
-
-      codesList.push({
-        code: codeStr,
-        server: "All",
-        rewards: [{ name: rewardStr, quantity: "1", icon: "" }],
-        rewardsText: `• **${rewardStr}**`,
-        duration: durationStr,
-        source: "WWPlus.net",
-      });
-    });
-
-    return codesList;
+    if (foundUrl && !foundUrl.startsWith("http")) {
+      foundUrl = new URL(foundUrl, "https://wwplus.net/").toString();
+    }
+    return foundUrl;
   } catch (err) {
-    console.error("⚠️ [Scraper] WWPlus scraper error:", err.message);
+    return null;
+  }
+}
+
+/**
+ * Gửi tin nhắn DM cảnh báo cho Admin khi WWPlus bị lỗi hoặc đổi URL mà bot không tự tìm lại được
+ */
+async function notifyAdminScraperFailure(client, errorDetail) {
+  if (!client || !ADMIN_ID) return;
+  const now = Date.now();
+  // Giới hạn tần suất: Chỉ gửi DM 1 lần mỗi 6 tiếng nếu lỗi tiếp diễn
+  if (now - lastWwplusAlertTs < 6 * 60 * 60 * 1000) return;
+  lastWwplusAlertTs = now;
+
+  await sendAdminDM(client, ADMIN_ID, {
+    title: "⚠️ CẢNH BÁO: NGUỒN CÀO CODE WWPLUS BỊ LỖI",
+    description: "Bot không thể lấy dữ liệu Giftcode từ **WWPlus.net**. Website có thể đã đổi URL hoặc thay đổi cấu trúc bảng.\n\n" +
+      `📌 **Chi tiết lỗi:** \`${errorDetail}\`\n` +
+      `🔗 **URL đang cào:** ${currentWwplusUrl}\n` +
+      "💡 **Hành động:** Bạn vui lòng vào kiểm tra lại `wwplus.net` xem đường dẫn bài viết code mới để cập nhật nhé.",
+    color: "#FFA500",
+  });
+}
+
+/**
+ * Bóc tách code từ một URL cụ thể của WWPlus
+ */
+async function scrapeWwplusFromUrl(targetUrl) {
+  const response = await axios.get(targetUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+    timeout: 10000,
+  });
+
+  if (!response.data) return [];
+  const $ = cheerio.load(response.data);
+  const codesList = [];
+
+  $("table.editor-table tr").each((_, tr) => {
+    const btn = $(tr).find("button.editor-giftcode-button");
+    const codeStr = (btn.attr("data-gift-code") || btn.text()).trim().toUpperCase();
+    if (!codeStr) return;
+
+    const tds = $(tr).find("td");
+    const rewardStr = $(tds[1]).text().trim() || "Astrite & Vật phẩm game";
+    const durationStr = $(tds[2]).text().trim() || "Còn hiệu lực";
+
+    codesList.push({
+      code: codeStr,
+      server: "All",
+      rewards: [{ name: rewardStr, quantity: "1", icon: "" }],
+      rewardsText: `• **${rewardStr}**`,
+      duration: durationStr,
+      source: "WWPlus.net",
+    });
+  });
+
+  return codesList;
+}
+
+/**
+ * Nguồn 1: WWPlus.net (Có cơ chế Auto-Discovery URL và cảnh báo DM Admin)
+ */
+async function scrapeWwplus(client = null) {
+  let codes = [];
+  let errorMsg = "";
+
+  // 1. Thử URL hiện tại
+  try {
+    codes = await scrapeWwplusFromUrl(currentWwplusUrl);
+  } catch (err) {
+    errorMsg = err.message;
+  }
+
+  // 2. Nếu URL hiện tại không có code hoặc bị lỗi (VD đổi sang slug tháng mới):
+  // Tự động vào trang chủ wwplus.net để quét menu tìm URL mới
+  if (!codes || codes.length === 0) {
+    console.log("⚠️ [Scraper] URL hiện tại của WWPlus không có code hoặc đổi link, đang tự động quét trang chủ...");
+    const discoveredUrl = await discoverWwplusCodeUrl();
+
+    if (discoveredUrl && discoveredUrl !== currentWwplusUrl) {
+      console.log(`🧭 [Scraper] Đã tự động phát hiện URL mới của WWPlus: ${discoveredUrl}`);
+      try {
+        codes = await scrapeWwplusFromUrl(discoveredUrl);
+        if (codes && codes.length > 0) {
+          currentWwplusUrl = discoveredUrl;
+        }
+      } catch (discErr) {
+        errorMsg = discErr.message;
+      }
+    }
+  }
+
+  // 3. Nếu vẫn không thể lấy được code (cả URL hiện tại lẫn trang chủ đều thất bại)
+  if (!codes || codes.length === 0) {
+    console.error("❌ [Scraper] Không thể cào dữ liệu từ WWPlus.net:", errorMsg || "Không tìm thấy bảng code");
+    if (client) {
+      await notifyAdminScraperFailure(client, errorMsg || "Không tìm thấy bảng mã code trên trang");
+    }
     return [];
   }
+
+  // Cào thành công: Reset cooldown cảnh báo
+  lastWwplusAlertTs = 0;
+  return codes;
 }
 
 /**
@@ -200,9 +299,9 @@ async function scrapeRedditBackup() {
 /**
  * Main Scrape function with Multi-Source Aggregation (WWPlus.net + Fandom Wiki)
  */
-async function scrapeWuwaCodes() {
+async function scrapeWuwaCodes(client = null) {
   const results = await Promise.allSettled([
-    scrapeWwplus(),
+    scrapeWwplus(client),
     scrapeFandomWiki(),
   ]);
 
@@ -248,4 +347,4 @@ async function scrapeWuwaCodes() {
   return mergedCodes;
 }
 
-module.exports = { scrapeWuwaCodes, scrapeWwplus, scrapeFandomWiki };
+module.exports = { scrapeWuwaCodes, scrapeWwplus, scrapeFandomWiki, discoverWwplusCodeUrl };
