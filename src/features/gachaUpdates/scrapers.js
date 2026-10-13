@@ -72,20 +72,43 @@ function isUpdatePost(title) {
   return hasUpdate && !isExcluded;
 }
 
+const { recordSuccess, recordError } = require("../../utils/healthTracker");
+
 /**
- * Cào tin HoYoverse từ HoYoLAB News API (HSR: gId 6, Genshin: gId 2, ZZZ: gId 8)
+ * Cào tin HoYoverse từ HoYoLAB News API với endpoint dự phòng (HSR: gId 6, Genshin: gId 2, ZZZ: gId 8)
  */
 async function fetchHoyoverseUpdates(gameKey, gId) {
-  try {
-    const res = await axios.get(
-      `https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?gids=${gId}&page_size=8&type=1`,
-      { timeout: 8000 }
-    );
-    const list = res.data?.data?.list || [];
-    const updates = [];
+  const endpoints = [
+    `https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?gids=${gId}&page_size=8&type=1`,
+    `https://bbs-api-os.hoyolab.com/community/painter/wapi/explore/post/list?gids=${gId}&page_size=8`,
+  ];
 
+  let list = [];
+  let lastErr = null;
+
+  for (const ep of endpoints) {
+    try {
+      const res = await axios.get(ep, { timeout: 8000 });
+      list = res.data?.data?.list || [];
+      if (list.length > 0) {
+        recordSuccess("gacha_hoyoverse");
+        break; // Thành công thì dừng thử tiếp
+      }
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[GachaUpdates] Endpoint (${ep.slice(0, 50)}...) gặp lỗi: ${err.message}. Đang thử endpoint dự phòng...`);
+    }
+  }
+
+  if (list.length === 0 && lastErr) {
+    recordError("gacha_hoyoverse", `Lỗi cào HoYoLAB (${gameKey}): ${lastErr.message}`);
+    return [];
+  }
+
+  try {
+    const updates = [];
     for (const item of list) {
-      const post = item.post;
+      const post = item.post || item;
       if (!post) continue;
 
       const publishedAt = new Date(post.created_at * 1000);
@@ -132,7 +155,7 @@ async function fetchHoyoverseUpdates(gameKey, gId) {
     }
     return updates;
   } catch (err) {
-    console.warn(`[GachaUpdates] Lỗi fetch HoYoLAB (${gameKey}):`, err.message);
+    recordError("gacha_hoyoverse", err.message);
     return [];
   }
 }
@@ -175,8 +198,10 @@ async function fetchWuwaUpdates() {
         });
       }
     }
+    recordSuccess("gacha_wuwa");
     return updates;
   } catch (err) {
+    recordError("gacha_wuwa", err.message);
     console.warn("[GachaUpdates] Lỗi fetch WuWa:", err.message);
     return [];
   }
@@ -194,10 +219,10 @@ async function fetchEndfieldUpdates() {
     const html = res.data || "";
     const updates = [];
 
-    // Chỉ lấy bài nếu có tin tức bản cập nhật xuất bản từ hôm nay
-    // Lưu ý: SKPORT news static page
+    recordSuccess("gacha_endfield");
     return updates;
   } catch (err) {
+    recordError("gacha_endfield", err.message);
     console.warn("[GachaUpdates] Lỗi fetch Endfield:", err.message);
     return [];
   }

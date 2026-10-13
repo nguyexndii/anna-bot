@@ -72,6 +72,7 @@ function createMasterHelpEmbed() {
       {
         name: "⚙️ HỆ THỐNG & QUẢN TRỊ (TOÀN BỘ KÊNH)",
         value:
+          `• \`!status\` / \`!health\` / \`!astatus\` *(Admin)* ➔ Bảng điều khiển giám sát sức khỏe toàn bộ API & Endpoint.\n` +
           `• \`!clear <1-100>\` / \`!xoa <1-100>\` *(Admin/Quản lý)* ➔ Xóa nhanh hàng loạt tin nhắn.\n` +
           `• \`!annahelp\` / \`!ahelp\` / \`!annalenh\` / \`!alenh\` ➔ Lệnh phụ xem bảng trợ giúp (không trùng bot khác).\n` +
           `• \`!lenh\` / \`!help\` / \`!command\` / \`!menu\` ➔ Các lệnh trợ giúp chuẩn.\n` +

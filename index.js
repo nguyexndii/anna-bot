@@ -282,6 +282,15 @@ client.once(Events.ClientReady, async () => {
   } catch (err) {
     console.error("❌ Lỗi khởi tạo Voice Keeper:", err.message);
   }
+
+  // Initialize System Health Tracker & Alert Monitor
+  try {
+    const { initHealthTracker } = require("./src/utils/healthTracker");
+    initHealthTracker(client);
+    console.log("🩺 Hệ thống Health Monitor đã sẵn sàng giám sát toàn bộ dịch vụ!");
+  } catch (err) {
+    console.error("❌ Lỗi khởi tạo Health Tracker:", err.message);
+  }
 });
 
 // Auto-leave if added to an unauthorized guild
@@ -316,8 +325,17 @@ client.on(Events.MessageCreate, async (message) => {
       if (handled) return;
     }
 
-    // 0.1 Lệnh Admin ép quét code HoYoverse tức thì (!checkhoyo)
     const lowerRaw = message.content.trim().toLowerCase();
+
+    // 0.05 Lệnh Kiểm tra Sức khỏe Toàn bộ Dịch vụ (!status, !health, !astatus, !ahealth)
+    if (lowerRaw === "!status" || lowerRaw === "!health" || lowerRaw === "!astatus" || lowerRaw === "!ahealth") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const { createHealthDashboardEmbed } = require("./src/utils/healthTracker");
+        const embed = createHealthDashboardEmbed();
+        return message.channel.send({ embeds: [embed] });
+      }
+    }
 
     // 0.1 Lệnh Admin ép quét code HoYoverse tức thì (!checkhoyo, !acheckhoyo)
     if (lowerRaw === "!checkhoyo" || lowerRaw === "!acheckhoyo") {

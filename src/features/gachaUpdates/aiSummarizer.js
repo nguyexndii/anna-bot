@@ -99,6 +99,8 @@ ${(rawContent || "").slice(0, 15000)}
         const resultText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (resultText && resultText.trim().length > 300) {
           console.log(`[GachaUpdates] ✨ Tóm tắt thành công bài [${gameKey}] bằng model: ${model} (${resultText.trim().length} ký tự)`);
+          const { recordSuccess } = require("../../utils/healthTracker");
+          recordSuccess("gemini_ai");
           return resultText.trim();
         }
       } catch (err) {
@@ -114,6 +116,10 @@ ${(rawContent || "").slice(0, 15000)}
       }
     }
   }
+
+  // Ghi nhận cảnh báo khi toàn bộ 5 model và 4 key đều fail
+  const { recordError } = require("../../utils/healthTracker");
+  recordError("gemini_ai", "Toàn bộ 5 model và 4 key đều không phản hồi");
 
   // Fallback an toàn (chỉ dùng khi toàn bộ model và 4 key đều không phản hồi)
   return `### Chi tiết bản cập nhật mới cho ${gameName}\n\n• **Phiên bản & Thời gian:** Bản cập nhật mới nhất đã chính thức ra mắt.\n• **Nội dung chính:** ${title}\n• **Hướng dẫn:** Xem toàn bộ bài viết chi tiết và hướng dẫn sự kiện tại liên kết bên dưới.`;
