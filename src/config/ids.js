@@ -21,9 +21,15 @@ module.exports = {
     WUWA_CODES: process.env.WUWA_CHANNEL_ID || "1528768068581457930",    // Kênh thông báo Code WuWa chính thức
   },
 
-  // Emoji IDs
+  // Emoji IDs (Application Emojis)
   EMOJIS: {
     WUWA_ICON: "1536322393411424286",
+    GENSHIN_LOGO: "1559502726985949184",
+    GENSHIN_PRIMO: "1559502712343896205",
+    HSR_LOGO: "1559502723148415096",
+    HSR_JADE: "1559502715564982292",
+    ZZZ_LOGO: "1559502720879173633",
+    ZZZ_POLY: "1559502718584750121",
   },
 
   // ID các Vai trò/Chức vụ (Roles)

@@ -274,6 +274,28 @@ client.on(Events.MessageCreate, async (message) => {
   if (!message.guild || !isAllowedGuild(message.guild.id)) return;
 
   try {
+    // 0.0 Lệnh Quản trị Xóa tin nhắn (!clear <x>, !xoa <x>)
+    if (message.content.startsWith("!clear") || message.content.startsWith("!xoa")) {
+      const { handleClearCommand } = require("./src/features/adminCommands");
+      const handled = await handleClearCommand(client, message);
+      if (handled) return;
+    }
+
+    // 0.1 Lệnh Admin ép quét code HoYoverse tức thì (!checkhoyo)
+    if (message.content.trim().toLowerCase() === "!checkhoyo") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const reply = await message.reply("🔄 Đang quét mã code HoYoverse (Genshin, HSR, ZZZ) ngay lập tức...").catch(() => null);
+        const { checkAndNotifyHoyoCodes } = require("./src/features/hoyoCodes");
+        await checkAndNotifyHoyoCodes(client);
+        if (reply) {
+          setTimeout(() => reply.delete().catch(() => {}), 4000);
+          setTimeout(() => message.delete().catch(() => {}), 4000);
+        }
+      }
+      return;
+    }
+
     // 0. Ưu tiên số 1: Lệnh tra cứu danh sách lệnh (!lenh, !help, !command, !comment, !menu...)
     // Hoạt động ở TOÀN BỘ CÁC KÊNH (kể cả kênh test nối từ, sắp xếp từ hay săn code)
     if (isMasterHelpCommand(message.content)) {

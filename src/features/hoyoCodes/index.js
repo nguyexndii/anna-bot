@@ -45,8 +45,8 @@ async function checkAndNotifyHoyoCodes(client) {
             if (msg.embeds && msg.embeds.length > 0) {
               for (const emb of msg.embeds) {
                 if (emb.description) {
-                  const match = emb.description.match(/`([A-Z0-9]{4,30})`/);
-                  if (match) codesInChannel.add(match[1]);
+                  const match = emb.description.match(/`([A-Za-z0-9_-]{4,40})`/);
+                  if (match) codesInChannel.add(match[1].toUpperCase());
                 }
               }
             }

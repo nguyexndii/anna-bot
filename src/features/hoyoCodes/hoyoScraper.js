@@ -6,25 +6,65 @@ const GAME_CONFIG = {
   genshin: {
     name: "Genshin Impact",
     fandomUrl: "https://genshin-impact.fandom.com/api.php?action=parse&page=Promotional_Code&format=json",
+    apiUrl: "https://hoyo-codes.seria.moe/codes?game=genshin",
     redeemBaseUrl: "https://genshin.hoyoverse.com/en/gift?code=",
     color: "#E6A23C",
-    icon: "https://static.wikia.nocookie.net/gensin-impact/images/d/d4/Item_Primogem.png/revision/latest/scale-to-width-down/150",
+    icon: "https://webstatic.hoyoverse.com/upload/op-public/2023/11/08/94c8b74618774776108b3c9bfce92080_4467319951670984918.png",
+    banner: "https://fastcdn.hoyoverse.com/mi18n/genshin/banners/ys_pc_1920x1080.jpg",
+    streamEn: "https://www.youtube.com/@GenshinImpact",
+    streamJp: "https://www.youtube.com/@Genshin_JP",
   },
   hsr: {
     name: "Honkai: Star Rail",
     fandomUrl: "https://honkai-star-rail.fandom.com/api.php?action=parse&page=Redemption_Code&format=json",
+    apiUrl: "https://hoyo-codes.seria.moe/codes?game=hkrpg",
     redeemBaseUrl: "https://hsr.hoyoverse.com/gift?code=",
     color: "#9C27B0",
-    icon: "https://static.wikia.nocookie.net/houkai-star-rail/images/c/ca/Item_Stellar_Jade.png/revision/latest/scale-to-width-down/150",
+    icon: "https://webstatic.hoyoverse.com/upload/op-public/2023/04/26/5d1668894452589e47f78c8577e77bca_739343717144171694.png",
+    banner: "https://fastcdn.hoyoverse.com/mi18n/hsr/banners/hkrpg_pc_1920x1080.jpg",
+    streamEn: "https://www.youtube.com/@HonkaiStarRail",
+    streamJp: "https://www.youtube.com/@Houkaistarrail_JP",
   },
   zzz: {
     name: "Zenless Zone Zero",
     fandomUrl: "https://zenless-zone-zero.fandom.com/api.php?action=parse&page=Redemption_Code&format=json",
+    apiUrl: "https://hoyo-codes.seria.moe/codes?game=nap",
     redeemBaseUrl: "https://zenless.hoyoverse.com/redemption?code=",
     color: "#FF9800",
-    icon: "https://static.wikia.nocookie.net/zenless-zone-zero/images/3/30/Item_Polychrome.png/revision/latest/scale-to-width-down/150",
+    icon: "https://fastcdn.hoyoverse.com/static-resource-v2/2024/07/04/436573c9bf1f39f1c79e7240c5e7b235_5348873722765355601.png",
+    banner: "https://fastcdn.hoyoverse.com/static-resource-v2/2024/07/04/b530c33fb355dbfc65ee3d1bfef0bc94_1064619992036495240.png",
+    streamEn: "https://www.youtube.com/@ZenlessZoneZero",
+    streamJp: "https://www.youtube.com/@ZZZ_JP",
   },
 };
+
+/**
+ * Cào mã code từ API hoyo-codes đã được validate
+ */
+async function fetchCodesFromApi(gameKey) {
+  const config = GAME_CONFIG[gameKey];
+  if (!config || !config.apiUrl) return [];
+  try {
+    const res = await axios.get(config.apiUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      timeout: 8000,
+    });
+    const list = res.data?.codes || [];
+    return list
+      .filter((c) => c.status === "OK" && c.code)
+      .map((c) => ({
+        game: gameKey,
+        code: c.code.trim().toUpperCase(),
+        server: "All",
+        rewardsText: c.rewards ? `• ${c.rewards.replace(/;/g, "\n• ")}` : "• Quà tặng vật phẩm game",
+        duration: "Còn hiệu lực",
+        redeemUrl: `${config.redeemBaseUrl}${c.code.trim().toUpperCase()}`,
+        source: "Hoyo Codes API",
+      }));
+  } catch (err) {
+    return [];
+  }
+}
 
 /**
  * Cào mã code Genshin Impact từ Fandom Wiki
@@ -179,23 +219,46 @@ async function scrapeZzzCodes() {
 }
 
 /**
- * Quét toàn bộ mã code của cả 3 game HoYoverse
+ * Quét toàn bộ mã code của cả 3 game HoYoverse (Hợp nhất API + Fandom Wiki)
  */
 async function scrapeAllHoyoCodes() {
-  const [genshin, hsr, zzz] = await Promise.allSettled([
+  const [apiGenshin, apiHsr, apiZzz, fandomGenshin, fandomHsr, fandomZzz] = await Promise.allSettled([
+    fetchCodesFromApi("genshin"),
+    fetchCodesFromApi("hsr"),
+    fetchCodesFromApi("zzz"),
     scrapeGenshinCodes(),
     scrapeHsrCodes(),
     scrapeZzzCodes(),
   ]);
 
+  const mergeGameCodes = (apiRes, fandomRes) => {
+    const map = new Map();
+    const apiCodes = apiRes.status === "fulfilled" ? apiRes.value : [];
+    const fandomCodes = fandomRes.status === "fulfilled" ? fandomRes.value : [];
+
+    // Nạp Fandom trước
+    for (const c of fandomCodes) {
+      if (c && c.code) map.set(c.code.toUpperCase(), c);
+    }
+    // Ghi đè / bổ sung từ API
+    for (const c of apiCodes) {
+      if (c && c.code) {
+        const key = c.code.toUpperCase();
+        const existing = map.get(key) || {};
+        map.set(key, { ...existing, ...c });
+      }
+    }
+    return Array.from(map.values());
+  };
+
   const results = {
-    genshin: genshin.status === "fulfilled" ? genshin.value : [],
-    hsr: hsr.status === "fulfilled" ? hsr.value : [],
-    zzz: zzz.status === "fulfilled" ? zzz.value : [],
+    genshin: mergeGameCodes(apiGenshin, fandomGenshin),
+    hsr: mergeGameCodes(apiHsr, fandomHsr),
+    zzz: mergeGameCodes(apiZzz, fandomZzz),
   };
 
   console.log(
-    `🔍 [Scraper Hoyo] Đã lấy: ${results.genshin.length} code Genshin, ${results.hsr.length} code HSR, ${results.zzz.length} code ZZZ.`
+    `🔍 [Scraper Hoyo Đa Nguồn] Tổng cộng: ${results.genshin.length} code Genshin, ${results.hsr.length} code HSR, ${results.zzz.length} code ZZZ.`
   );
 
   return results;

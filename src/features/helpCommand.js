@@ -47,9 +47,11 @@ function createMasterHelpEmbed() {
         inline: false,
       },
       {
-        name: "⚙️ HỆ THỐNG & TRỢ GIÚP CHUNG",
+        name: "⚙️ HỆ THỐNG & QUẢN TRỊ",
         value:
           `📌 **Kênh sử dụng:** Tất cả các kênh trong server\n` +
+          `• \`!clear <1-100>\` / \`!xoa <1-100>\` *(Admin / Quản lý)* ➔ Xóa nhanh số lượng tin nhắn trong kênh.\n` +
+          `• \`!checkhoyo\` *(Admin)* ➔ Quét và gửi code HoYoverse mới vào kênh demo ngay lập tức.\n` +
           `• \`!lenh\` / \`!help\` / \`!command\` / \`!comment\` / \`!lenhanna\` ➔ Xem bảng danh sách toàn bộ lệnh bot.\n` +
           `• \`alo\` ➔ Gọi tổng đài bot phản hồi vui.`,
         inline: false,
