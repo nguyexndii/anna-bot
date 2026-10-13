@@ -12,7 +12,7 @@ const ASTRITE_ICON_URL = "https://static.wikia.nocookie.net/wutheringwaves/image
  */
 async function createWuwaCodeEmbed(codeObj) {
   const emojiId = WUWA_EMOJI_ID || "1536322393411424286";
-  const emojiMention = `<:wuwa:${emojiId}>`;
+  const emojiMention = `<:wutheringwave:${emojiId}>`;
   const defaultIconUrl = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
 
   // Translate duration string to Vietnamese
@@ -20,11 +20,11 @@ async function createWuwaCodeEmbed(codeObj) {
   const rewardsContent = codeObj.rewardsText || "• Chưa có thông tin phần thưởng";
 
   const embed = new EmbedBuilder()
-    .setTitle(`${emojiMention} WUTHERING WAVES — REDEEM CODE`)
+    .setTitle("🎁 WUTHERING WAVES — REDEEM CODE")
     .setColor("#00D2FF")
     .setThumbnail(ASTRITE_ICON_URL)
     .setDescription(
-      `### \`${codeObj.code}\`\n\n` +
+      `### ${emojiMention} \`${codeObj.code}\`\n\n` +
       `**Phần thưởng:**\n${rewardsContent}\n\n` +
       `**Trạng thái:** \`${durationVN}\``
     )
@@ -44,7 +44,7 @@ async function createWuwaCodeEmbed(codeObj) {
  */
 async function createWuwaExpiringSoonEmbed(expiringCodes) {
   const emojiId = WUWA_EMOJI_ID || "1536322393411424286";
-  const emojiMention = `<:wuwa:${emojiId}>`;
+  const emojiMention = `<:wutheringwave:${emojiId}>`;
   const defaultIconUrl = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
 
   const lines = [];
@@ -54,9 +54,9 @@ async function createWuwaExpiringSoonEmbed(expiringCodes) {
   }
 
   const embed = new EmbedBuilder()
-    .setTitle(`${emojiMention} CẢNH BÁO: CODE SẮP HẾT HẠN (24H)`)
+    .setTitle("⏰ CẢNH BÁO: CODE SẮP HẾT HẠN (24H)")
     .setDescription(
-      "Các mã quà tặng dưới đây **sắp hết hạn trong 24 giờ tới**. Hãy nhanh chóng nhập vào tài khoản nhé:\n\n" +
+      `${emojiMention} Các mã quà tặng dưới đây **sắp hết hạn trong 24 giờ tới**. Hãy nhanh chóng nhập vào tài khoản nhé:\n\n` +
       lines.join("\n")
     )
     .setColor("#FF4757")
