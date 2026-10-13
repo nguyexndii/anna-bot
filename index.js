@@ -327,13 +327,15 @@ client.on(Events.MessageCreate, async (message) => {
             const { fetchWuwaLivestreamInfo } = require("./src/features/wuwaCodes/wuwaScraper");
             const liveInfo = await fetchWuwaLivestreamInfo();
             const sampleWuwaLive = {
-              version: "2.1",
-              bannerUrl: liveInfo?.bannerUrl || "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/slide-picture/087sw5peq5mquvlulz.png",
-              time: "18:00 (UTC+8) Ngày 25/10/2026",
+              version: "3.7",
+              bannerUrl: "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/slide-picture/087sw5peq5mquvlulz.png",
+              streamYoutube: "https://youtu.be/xLWZ-bApa2c?si=JdBiUsz4qL0Sxwvg",
+              streamTwitch: "https://www.twitch.tv/wuthering_waves",
+              time: "Phát sóng ngày 19/09/2026",
               codes: [
-                { code: "WUWAVERSION21A", rewardsText: "• Astrite x100\n• Shell Credit x40000", duration: "Còn hiệu lực 48h" },
-                { code: "WUWAVERSION21B", rewardsText: "• Astrite x100\n• Advanced Energy Core x3", duration: "Còn hiệu lực 48h" },
-                { code: "WUWAVERSION21C", rewardsText: "• Astrite x100\n• Premium Tuner x20", duration: "Còn hiệu lực 48h" },
+                { code: "FALLINGSANCTUM", rewardsText: "• Astrite x100\n• Premium Resonance Potion x2\n• Advanced Inhaler x2", duration: "Đã hết hạn" },
+                { code: "WAKINGMOON", rewardsText: "• Astrite x100\n• Advanced Sealed Tube x2\n• Premium Tuner x10", duration: "Đã hết hạn" },
+                { code: "FINDSENTINEL", rewardsText: "• Astrite x100\n• Shell Credit x40000\n• Premium Enclosure Tank x1", duration: "Đã hết hạn" },
               ],
             };
             const result = await createWuwaLivestreamMessage(sampleWuwaLive);
