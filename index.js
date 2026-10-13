@@ -12,6 +12,7 @@ const {
   WORDSCRAMBLE_CHANNEL_ID,
   RULES_CHANNEL_ID,
   WUWA_CODES_CHANNEL_ID,
+  HOYO_CODES_CHANNEL_ID,
   ALLOWED_GUILD_IDS,
   KEEP_VOICE_CHANNEL_ID,
   ENABLE_VOICE_KEEPER,
@@ -43,6 +44,9 @@ const { createScrambleChallengeEmbed } = require("./src/features/wordscramble/em
 // WuWa Code Watcher & Commands
 const { initWuwaCodeWatcher } = require("./src/features/wuwaCodes");
 const { onWuwaCodeMessage } = require("./src/features/wuwaCodes/commandHandler");
+
+// HoYoverse (Genshin, HSR, ZZZ) Code Watcher
+const { initHoyoCodeWatcher } = require("./src/features/hoyoCodes");
 
 // Master Help Command (!lenh, !help, !command, !comment...)
 const { onHelpMessage, isMasterHelpCommand } = require("./src/features/helpCommand");
@@ -238,6 +242,14 @@ client.once(Events.ClientReady, async () => {
     console.log(`🎁 Săn Code Wuthering Waves đã kích hoạt tại kênh <#${WUWA_CODES_CHANNEL_ID}>`);
   } catch (err) {
     console.error("❌ Lỗi khởi tạo WuWa Code Watcher:", err.message);
+  }
+
+  // Initialize HoYoverse Code Watcher (Genshin, HSR, ZZZ)
+  try {
+    initHoyoCodeWatcher(client);
+    console.log(`🎮 Săn Code HoYoverse (Genshin, HSR, ZZZ) đã kích hoạt tại kênh demo <#${HOYO_CODES_CHANNEL_ID}>`);
+  } catch (err) {
+    console.error("❌ Lỗi khởi tạo Hoyo Code Watcher:", err.message);
   }
 
   // Initialize 24/7 Smart Voice Room Keeper

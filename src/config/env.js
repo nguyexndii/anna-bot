@@ -58,6 +58,9 @@ module.exports = {
   WUWA_ROLE_ID: process.env.WUWA_ROLE_ID || (ROLES && ROLES.WUWA_ROLE) || null,
   WUWA_EMOJI_ID: (EMOJIS && EMOJIS.WUWA_ICON) || "1536322393411424286",
 
+  // Kênh Săn Code HoYoverse (Genshin, HSR, ZZZ) - Mặc định kênh demo
+  HOYO_CODES_CHANNEL_ID: process.env.HOYO_CODES_CHANNEL_ID || "1547084091868844142",
+
   // 24/7 Smart Voice Room Keeper
   KEEP_VOICE_CHANNEL_ID: process.env.KEEP_VOICE_CHANNEL_ID || "1389843439851671624",
   ENABLE_VOICE_KEEPER: process.env.ENABLE_VOICE_KEEPER !== "false",
