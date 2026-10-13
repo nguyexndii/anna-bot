@@ -347,4 +347,56 @@ async function scrapeWuwaCodes(client = null) {
   return mergedCodes;
 }
 
-module.exports = { scrapeWuwaCodes, scrapeWwplus, scrapeFandomWiki, discoverWwplusCodeUrl };
+/**
+ * Lấy banner và thông báo livestream Special Program từ Kuro Games Launcher CDN
+ */
+async function fetchWuwaLivestreamInfo() {
+  try {
+    const res = await axios.get("https://prod-alicdn-gamestarter.kurogame.com/launcher/50004_obOHXFrFanqsaIEOmuKroCcbZkQRBC7c/G153/information/en.json", {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      timeout: 8000,
+    });
+
+    const data = res.data;
+    if (!data) return null;
+
+    // Tìm banner từ slideshow
+    let bannerUrl = null;
+    const slides = data.slideshow || [];
+    for (const s of slides) {
+      if (s.carouselNotes && (s.carouselNotes.includes("版本pv") || s.carouselNotes.includes("pv") || s.carouselNotes.includes("live") || s.carouselNotes.includes("special"))) {
+        bannerUrl = s.url;
+        break;
+      }
+    }
+    if (!bannerUrl && slides[0]) bannerUrl = slides[0].url;
+
+    // Tìm thông báo về livestream / preview
+    const notices = data.guidance?.notice?.contents || [];
+    let liveNotice = null;
+    for (const n of notices) {
+      const text = (n.content || "").toLowerCase();
+      if (text.includes("special program") || text.includes("preview") || text.includes("livestream") || text.includes("broadcast")) {
+        liveNotice = n;
+        break;
+      }
+    }
+
+    return {
+      bannerUrl: bannerUrl || "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/slide-picture/087sw5peq5mquvlulz.png",
+      notice: liveNotice,
+      slides,
+    };
+  } catch (err) {
+    console.warn("⚠️ [WuWa Scraper] Không thể lấy thông tin livestream từ launcher:", err.message);
+    return null;
+  }
+}
+
+module.exports = {
+  scrapeWuwaCodes,
+  scrapeWwplus,
+  scrapeFandomWiki,
+  discoverWwplusCodeUrl,
+  fetchWuwaLivestreamInfo,
+};

@@ -307,7 +307,7 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // 0.2 Lệnh Admin gửi tin nhắn mẫu Livestream để xem trước giao diện (!testlive [zzz|hsr|genshin])
+    // 0.2 Lệnh Admin gửi tin nhắn mẫu Livestream để xem trước giao diện (!testlive [zzz|hsr|genshin|wuwa])
     if (message.content.trim().toLowerCase().startsWith("!testlive")) {
       const { ADMIN_IDS, ADMIN_ID, HOYO_CODES_CHANNEL_ID } = require("./src/config/env");
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
@@ -320,44 +320,70 @@ client.on(Events.MessageCreate, async (message) => {
         const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
 
         if (targetChannel && targetChannel.isTextBased()) {
-          let streamData;
-          if (gameArg === "hsr") {
-            streamData = {
-              game: "hsr",
-              version: "2.6",
-              bannerUrl: "https://fastcdn.hoyoverse.com/mi18n/hsr/banners/hkrpg_pc_1920x1080.jpg",
+          let embed, components, gameLabel;
+
+          if (gameArg === "wuwa" || gameArg === "ww") {
+            const { createWuwaLivestreamMessage } = require("./src/features/wuwaCodes/embedBuilder");
+            const { fetchWuwaLivestreamInfo } = require("./src/features/wuwaCodes/wuwaScraper");
+            const liveInfo = await fetchWuwaLivestreamInfo();
+            const sampleWuwaLive = {
+              version: "2.1",
+              bannerUrl: liveInfo?.bannerUrl || "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/slide-picture/087sw5peq5mquvlulz.png",
+              time: "18:00 (UTC+8) Ngày 25/10/2026",
               codes: [
-                { code: "3S3XKXZ5NU27", rewardsText: "100 Stellar Jade, 50,000 Credits", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=3S3XKXZ5NU27" },
-                { code: "5T3XZXZ5NU28", rewardsText: "100 Stellar Jade, 5 Traveler's Guide", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=5T3XZXZ5NU28" },
-                { code: "7B3XZXZ5NU29", rewardsText: "100 Stellar Jade, 4 Refined Aether", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=7B3XZXZ5NU29" }
-              ]
+                { code: "WUWAVERSION21A", rewardsText: "• Astrite x100\n• Shell Credit x40000", duration: "Còn hiệu lực 48h" },
+                { code: "WUWAVERSION21B", rewardsText: "• Astrite x100\n• Advanced Energy Core x3", duration: "Còn hiệu lực 48h" },
+                { code: "WUWAVERSION21C", rewardsText: "• Astrite x100\n• Premium Tuner x20", duration: "Còn hiệu lực 48h" },
+              ],
             };
-          } else if (gameArg === "genshin" || gameArg === "gi") {
-            streamData = {
-              game: "genshin",
-              version: "5.1",
-              bannerUrl: "https://fastcdn.hoyoverse.com/mi18n/genshin/banners/ys_pc_1920x1080.jpg",
-              codes: [
-                { code: "GENSHINLIVE1", rewardsText: "100 Primogem, 10 Mystic Enhancement Ore", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE1" },
-                { code: "GENSHINLIVE2", rewardsText: "100 Primogem, 5 Hero's Wit", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE2" },
-                { code: "GENSHINLIVE3", rewardsText: "100 Primogem, 50,000 Mora", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE3" }
-              ]
-            };
+            const result = await createWuwaLivestreamMessage(sampleWuwaLive);
+            embed = result.embed;
+            components = result.components;
+            gameLabel = "Wuthering Waves";
           } else {
-            const zzzBanner = await fetchLivestreamBanner("zzz");
-            streamData = {
-              game: "zzz",
-              version: "3.3",
-              bannerUrl: zzzBanner,
-              codes: [
-                { code: "JRNY2SKY", rewardsText: "300 Polychrome, 30,000 Denny, 2 Senior Investigator Log, 2 W-Engine Battery", duration: "Đã hết hạn", redeemUrl: "https://zenless.hoyoverse.com/redemption?code=JRNY2SKY" }
-              ]
-            };
+            let streamData;
+            if (gameArg === "hsr") {
+              streamData = {
+                game: "hsr",
+                version: "2.6",
+                bannerUrl: "https://fastcdn.hoyoverse.com/mi18n/hsr/banners/hkrpg_pc_1920x1080.jpg",
+                codes: [
+                  { code: "3S3XKXZ5NU27", rewardsText: "100 Stellar Jade, 50,000 Credits", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=3S3XKXZ5NU27" },
+                  { code: "5T3XZXZ5NU28", rewardsText: "100 Stellar Jade, 5 Traveler's Guide", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=5T3XZXZ5NU28" },
+                  { code: "7B3XZXZ5NU29", rewardsText: "100 Stellar Jade, 4 Refined Aether", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=7B3XZXZ5NU29" }
+                ]
+              };
+            } else if (gameArg === "genshin" || gameArg === "gi") {
+              streamData = {
+                game: "genshin",
+                version: "5.1",
+                bannerUrl: "https://fastcdn.hoyoverse.com/mi18n/genshin/banners/ys_pc_1920x1080.jpg",
+                codes: [
+                  { code: "GENSHINLIVE1", rewardsText: "100 Primogem, 10 Mystic Enhancement Ore", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE1" },
+                  { code: "GENSHINLIVE2", rewardsText: "100 Primogem, 5 Hero's Wit", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE2" },
+                  { code: "GENSHINLIVE3", rewardsText: "100 Primogem, 50,000 Mora", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE3" }
+                ]
+              };
+            } else {
+              const zzzBanner = await fetchLivestreamBanner("zzz");
+              streamData = {
+                game: "zzz",
+                version: "3.3",
+                bannerUrl: zzzBanner,
+                codes: [
+                  { code: "JRNY2SKY", rewardsText: "300 Polychrome, 30,000 Denny, 2 Senior Investigator Log, 2 W-Engine Battery", duration: "Đã hết hạn", redeemUrl: "https://zenless.hoyoverse.com/redemption?code=JRNY2SKY" }
+                ]
+              };
+            }
+
+            const hoyoRes = createLivestreamCodeMessage(streamData);
+            embed = hoyoRes.embed;
+            components = hoyoRes.components;
+            gameLabel = streamData.game.toUpperCase();
           }
 
-          const { embed, components } = createLivestreamCodeMessage(streamData);
           await targetChannel.send({ embeds: [embed], components });
-          const reply = await message.reply(`✅ Đã gửi mẫu livestream **${streamData.game.toUpperCase()}** vào kênh demo <#${targetChannelId}>!`).catch(() => null);
+          const reply = await message.reply(`✅ Đã gửi mẫu livestream **${gameLabel}** vào kênh demo <#${targetChannelId}>!`).catch(() => null);
           if (reply) {
             setTimeout(() => reply.delete().catch(() => {}), 4000);
             setTimeout(() => message.delete().catch(() => {}), 4000);

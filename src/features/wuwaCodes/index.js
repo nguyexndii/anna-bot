@@ -1,7 +1,7 @@
 // src/features/wuwaCodes/index.js
 const { WebhookClient } = require("discord.js");
-const { scrapeWuwaCodes } = require("./wuwaScraper");
-const { createWuwaCodeEmbed } = require("./embedBuilder");
+const { scrapeWuwaCodes, fetchWuwaLivestreamInfo } = require("./wuwaScraper");
+const { createWuwaCodeEmbed, createWuwaLivestreamMessage } = require("./embedBuilder");
 const WuwaCodeModel = require("../../database/models/WuwaCode");
 const { WUWA_CODES_CHANNEL_ID, WUWA_ROLE_ID, WEBHOOK_WUWA_CODES } = require("../../config/env");
 
@@ -9,6 +9,7 @@ const { isPermanentCode } = require("./wuwaUtils");
 
 // In-memory fallback set for known codes if MongoDB is not connected
 const knownCodesSet = new Set();
+const knownWuwaLivestreamSet = new Set();
 
 /**
  * Send notification via Webhook (with fallback to channel.send)
@@ -390,6 +391,46 @@ async function deleteManualCode(identifier) {
 }
 
 /**
+ * Kiểm tra và thông báo Livestream Special Program mới của Wuthering Waves
+ * Quy tắc: Tuyệt đối KHÔNG TAG ROLE, chỉ thông báo khi có stream mới (không báo cũ)
+ * @param {import("discord.js").Client} client
+ */
+async function checkAndNotifyWuwaLivestream(client) {
+  try {
+    const liveInfo = await fetchWuwaLivestreamInfo();
+    if (!liveInfo || !liveInfo.notice) return;
+
+    const noticeKey = liveInfo.notice.content;
+    if (knownWuwaLivestreamSet.has(noticeKey)) {
+      return; // Đã thông báo rồi hoặc nằm trong mốc cũ
+    }
+
+    console.log(`🎉 [WuWa Livestream] PHÁT HIỆN THÔNG BÁO LIVESTREAM MỚI: "${noticeKey}"!`);
+    knownWuwaLivestreamSet.add(noticeKey);
+
+    const targetChannelId = WUWA_CODES_CHANNEL_ID || "1528768068581457930";
+    const channel = await client.channels.fetch(targetChannelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) return;
+
+    const verMatch = noticeKey.match(/Version\s*([\d\.]+)/i);
+    const version = verMatch ? verMatch[1] : "Mới";
+
+    const streamData = {
+      version,
+      bannerUrl: liveInfo.bannerUrl,
+      time: liveInfo.notice.time ? `Ngày ${liveInfo.notice.time}` : "Xem chi tiết tại kênh chính thức",
+    };
+
+    const { embed, components } = await createWuwaLivestreamMessage(streamData);
+    // Quy tắc: Tuyệt đối KHÔNG TAG ROLE cho thông báo livestream
+    await sendWuwaNotification(client, channel, embed, null, components);
+    console.log(`✅ [WuWa Livestream] Đã gửi thông báo livestream mới tới kênh (${targetChannelId}) không tag role.`);
+  } catch (err) {
+    console.warn("⚠️ [WuWa Livestream] Lỗi kiểm tra livestream:", err.message);
+  }
+}
+
+/**
  * Initialize WuWa Code Auto Watcher
  * Runs immediately on startup and sets periodic timer (30 mins)
  * @param {import("discord.js").Client} client
@@ -437,20 +478,32 @@ function initWuwaCodeWatcher(client) {
     }
   }).catch(() => {});
 
+  // 3. Khóa mốc thông báo livestream ban đầu (không báo tin cũ)
+  fetchWuwaLivestreamInfo().then((info) => {
+    if (info?.notice?.content) {
+      knownWuwaLivestreamSet.add(info.notice.content);
+      console.log(`🔒 [WuWa Livestream] Đã khóa mốc livestream ban đầu: "${info.notice.content}"`);
+    }
+  }).catch(() => {});
+
   // Chạy kiểm tra sau 8 giây khi khởi động
   setTimeout(() => {
     checkAndNotifyWuwaCodes(client);
+    checkAndNotifyWuwaLivestream(client);
   }, 8000);
 
   // Set định kỳ kiểm tra mỗi 30 phút (1,800,000 ms)
   setInterval(() => {
     checkAndNotifyWuwaCodes(client);
+    checkAndNotifyWuwaLivestream(client);
   }, 30 * 60 * 1000);
 }
 
 module.exports = {
   initWuwaCodeWatcher,
   checkAndNotifyWuwaCodes,
+  checkAndNotifyWuwaLivestream,
+  createWuwaLivestreamMessage,
   addManualCode,
   listManualCodes,
   updateManualCode,
