@@ -20,6 +20,7 @@ const PROD_CHANNELS = {
   WORDCHAIN: "1450065511231520778",      // Kênh Nối Từ chính
   WORDSCRAMBLE: "1535705241620717720",   // Kênh Sắp Xếp Từ chính
   WUWA_CODES: "1528768068581457930",     // Kênh Săn Code WuWa chính
+  HOYO_CODES: "1528768068581457930",     // Kênh Săn Code HoYoverse chính thức
   RULES: "1450073214620405903",          // Kênh Luật chơi chính
 };
 
@@ -27,6 +28,7 @@ const TEST_CHANNELS = {
   WORDCHAIN: "1547083697688285255",      // Kênh Nối Từ test
   WORDSCRAMBLE: "1547083889124573184",   // Kênh Sắp Xếp Từ test
   WUWA_CODES: "1547084091868844142",     // Kênh Săn Code WuWa test
+  HOYO_CODES: "1547084091868844142",     // Kênh Săn Code HoYoverse test demo
   RULES: "1547083697688285255",          // Kênh Luật chơi khi test
 };
 
@@ -58,8 +60,8 @@ module.exports = {
   WUWA_ROLE_ID: process.env.WUWA_ROLE_ID || (ROLES && ROLES.WUWA_ROLE) || null,
   WUWA_EMOJI_ID: (EMOJIS && EMOJIS.WUWA_ICON) || "1536322393411424286",
 
-  // Kênh Săn Code HoYoverse (Genshin, HSR, ZZZ) - Mặc định kênh demo
-  HOYO_CODES_CHANNEL_ID: process.env.HOYO_CODES_CHANNEL_ID || "1547084091868844142",
+  // Kênh Săn Code HoYoverse (Genshin, HSR, ZZZ) - Mặc định kênh chính thức 1528768068581457930
+  HOYO_CODES_CHANNEL_ID: IS_TEST_MODE ? TEST_CHANNELS.HOYO_CODES : (process.env.HOYO_CODES_CHANNEL_ID || PROD_CHANNELS.HOYO_CODES),
 
   // 24/7 Smart Voice Room Keeper
   KEEP_VOICE_CHANNEL_ID: process.env.KEEP_VOICE_CHANNEL_ID || "1389843439851671624",

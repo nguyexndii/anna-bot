@@ -19,6 +19,7 @@ module.exports = {
     IMAGE_UPLOAD: "1389842916725231626",                                 // Kênh gửi ảnh
     AI_CHAT: ["1490235696118497280", "1447095306079698984"],             // Các kênh chat AI
     WUWA_CODES: process.env.WUWA_CHANNEL_ID || "1528768068581457930",    // Kênh thông báo Code WuWa chính thức
+    HOYO_CODES: process.env.HOYO_CODES_CHANNEL_ID || "1528768068581457930", // Kênh thông báo Code HoYoverse chính thức
   },
 
   // Emoji IDs (Application Emojis)

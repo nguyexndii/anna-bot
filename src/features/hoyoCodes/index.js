@@ -8,12 +8,12 @@ const { HOYO_CODES_CHANNEL_ID } = require("../../config/env");
 const knownHoyoCodesSet = new Set();
 
 /**
- * Kiểm tra và thông báo các mã code mới của HoYoverse vào kênh Discord demo
+ * Kiểm tra và thông báo các mã code mới của HoYoverse vào kênh Discord chính thức
  * @param {import("discord.js").Client} client
  */
 async function checkAndNotifyHoyoCodes(client) {
   try {
-    const targetChannelId = HOYO_CODES_CHANNEL_ID || "1547084091868844142";
+    const targetChannelId = HOYO_CODES_CHANNEL_ID || "1528768068581457930";
     console.log(`🔄 [Hoyo Code Watcher] Đang kiểm tra code Genshin, HSR & ZZZ cho kênh <#${targetChannelId}>...`);
 
     // 1. Cào live toàn bộ code từ web
@@ -89,15 +89,18 @@ async function checkAndNotifyHoyoCodes(client) {
     for (const codeObj of liveCodesList) {
       const codeKey = `${codeObj.game}_${codeObj.code}`;
       const isAlreadyInChannel = codesInChannel.has(codeObj.code);
+      const isAlreadyKnown = knownHoyoCodesSet.has(codeKey);
 
       let existingDoc = null;
       try {
         existingDoc = await HoyoCodeModel.findOne({ game: codeObj.game, code: codeObj.code });
       } catch (dbErr) {}
 
-      // Nếu code chưa xuất hiện trong kênh Discord
-      if (!isAlreadyInChannel) {
-        console.log(`🎉 [Hoyo Code Watcher] PHÁT HIỆN CODE MỚI (${codeObj.game.toUpperCase()}): "${codeObj.code}"!`);
+      // CHỈ GỬI THÔNG BÁO NẾU:
+      // 1. Code chưa từng xuất hiện trong kênh Discord (!isAlreadyInChannel)
+      // 2. VÀ Code KHÔNG PHẢI là code cũ trước thời điểm kích hoạt hôm nay (!isAlreadyKnown && (!existingDoc || !existingDoc.notified))
+      if (!isAlreadyInChannel && !isAlreadyKnown && (!existingDoc || !existingDoc.notified)) {
+        console.log(`🎉 [Hoyo Code Watcher] PHÁT HIỆN CODE MỚI TINH (${codeObj.game.toUpperCase()}): "${codeObj.code}"!`);
 
         // Lưu vào DB & Set bộ nhớ
         knownHoyoCodesSet.add(codeKey);
@@ -129,13 +132,14 @@ async function checkAndNotifyHoyoCodes(client) {
               components,
             });
             codesInChannel.add(codeObj.code);
-            console.log(`✅ Đã gửi thông báo code ${codeObj.game.toUpperCase()} "${codeObj.code}" tới kênh demo (${targetChannelId})!`);
+            console.log(`✅ Đã gửi thông báo code ${codeObj.game.toUpperCase()} "${codeObj.code}" tới kênh chính (${targetChannelId})!`);
           } catch (sendErr) {
             console.error(`❌ Lỗi gửi tin nhắn code "${codeObj.code}":`, sendErr.message);
           }
         }
       } else {
-        // Đã có trong kênh -> cập nhật DB nếu cần
+        // Đã biết hoặc đã có trong kênh -> cập nhật DB & Set bộ nhớ để không bao giờ gửi lại
+        knownHoyoCodesSet.add(codeKey);
         if (existingDoc && !existingDoc.notified) {
           existingDoc.notified = true;
           await existingDoc.save().catch(() => {});
@@ -152,16 +156,43 @@ async function checkAndNotifyHoyoCodes(client) {
  * @param {import("discord.js").Client} client
  */
 function initHoyoCodeWatcher(client) {
-  const targetChannelId = HOYO_CODES_CHANNEL_ID || "1547084091868844142";
-  console.log(`🚀 [Hoyo Code Watcher] Đã kích hoạt theo dõi Code Genshin, HSR & ZZZ cho kênh demo (${targetChannelId})!`);
+  const targetChannelId = HOYO_CODES_CHANNEL_ID || "1528768068581457930";
+  console.log(`🚀 [Hoyo Code Watcher] Đã kích hoạt theo dõi Code Genshin, HSR & ZZZ cho kênh chính thức (${targetChannelId})!`);
 
-  // Hydrate danh sách code đã biết từ MongoDB Atlas
-  HoyoCodeModel.find({}).then((docs) => {
+  // 1. Nạp danh sách code đã biết từ MongoDB Atlas
+  HoyoCodeModel.find({}).then(async (docs) => {
     if (docs && docs.length > 0) {
       for (const doc of docs) {
         knownHoyoCodesSet.add(`${doc.game}_${doc.code}`);
       }
       console.log(`🍃 [Hoyo Code Watcher] Đã nạp ${docs.length} code HoYoverse đã biết từ MongoDB.`);
+    }
+
+    // 2. Chốt toàn bộ code hiện tại trên web làm mốc cũ (Baseline)
+    // Tuyệt đối không gửi spam những code đã phát hành trước thời điểm kích hoạt hôm nay
+    try {
+      const allScraped = await scrapeAllHoyoCodes();
+      const allCurrent = [...allScraped.genshin, ...allScraped.hsr, ...allScraped.zzz];
+      for (const c of allCurrent) {
+        knownHoyoCodesSet.add(`${c.game}_${c.code}`);
+        await HoyoCodeModel.findOneAndUpdate(
+          { game: c.game, code: c.code },
+          {
+            game: c.game,
+            code: c.code,
+            server: c.server || "Tất cả",
+            rewardsText: c.rewardsText || "• Chưa có thông tin phần thưởng",
+            duration: c.duration || "Còn hiệu lực",
+            redeemUrl: c.redeemUrl || "",
+            isActive: true,
+            notified: true,
+          },
+          { upsert: true }
+        ).catch(() => {});
+      }
+      console.log(`🔒 [Hoyo Code Watcher] Đã khóa mốc ban đầu (${knownHoyoCodesSet.size} code cũ sẽ không bị gửi lại).`);
+    } catch (baselineErr) {
+      console.error("⚠️ Lỗi chốt baseline code cũ:", baselineErr.message);
     }
   }).catch(() => {});
 

@@ -49,12 +49,13 @@ const bannerCache = new Map();
 /**
  * Lấy ảnh banner Special Program / Livestream chính thức từ HoYoLAB
  * @param {string} gameKey
+ * @param {boolean} onlyToday - Nếu true, chỉ lấy các bài viết/livestream được đăng từ hôm nay trở đi
  * @returns {Promise<string|null>}
  */
-async function fetchLivestreamBanner(gameKey) {
+async function fetchLivestreamBanner(gameKey, onlyToday = false) {
   const cached = bannerCache.get(gameKey);
   if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
-    return cached.banner;
+    if (!onlyToday || cached.isToday) return cached.banner;
   }
 
   const config = GAME_CONFIG[gameKey];
@@ -70,8 +71,17 @@ async function fetchLivestreamBanner(gameKey) {
       timeout: 8000,
     });
 
+    const now = new Date();
+    // Mốc thời gian 00:00:00 của ngày hôm nay (epoch seconds)
+    const startOfTodaySeconds = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+
     const posts = res.data?.data?.list || [];
     for (const item of posts.slice(0, 10)) {
+      const postCreatedAt = item.post?.created_at || 0;
+      if (onlyToday && postCreatedAt < startOfTodaySeconds) {
+        continue; // Bỏ qua nếu bài viết đăng trước ngày hôm nay
+      }
+
       const subject = item.post?.subject?.toLowerCase() || "";
       if (
         subject.includes("special program") ||
@@ -81,7 +91,7 @@ async function fetchLivestreamBanner(gameKey) {
       ) {
         const cover = item.post?.cover_list?.[0]?.url || item.post?.images?.[0];
         if (cover) {
-          bannerCache.set(gameKey, { banner: cover, timestamp: Date.now() });
+          bannerCache.set(gameKey, { banner: cover, isToday: postCreatedAt >= startOfTodaySeconds, timestamp: Date.now() });
           return cover;
         }
 
@@ -97,7 +107,7 @@ async function fetchLivestreamBanner(gameKey) {
           const p = detailRes.data?.data?.post;
           const detailCover = p?.cover_list?.[0]?.url || p?.image_list?.[0]?.url;
           if (detailCover) {
-            bannerCache.set(gameKey, { banner: detailCover, timestamp: Date.now() });
+            bannerCache.set(gameKey, { banner: detailCover, isToday: postCreatedAt >= startOfTodaySeconds, timestamp: Date.now() });
             return detailCover;
           }
         }
