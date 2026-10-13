@@ -1,73 +1,67 @@
 // src/features/wuwaCodes/embedBuilder.js
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const { WUWA_EMOJI_ID } = require("../../config/env");
 const { translateDurationToVN } = require("./wuwaUtils");
 
-const ASTRITE_ICON_URL = "https://static.wikia.nocookie.net/wutheringwaves/images/1/16/Item_Astrite.png/revision/latest/scale-to-width-down/150";
+/**
+ * Định dạng phần thưởng cho gọn gàng và đẹp mắt
+ */
+function formatRewards(rewardsText) {
+  if (!rewardsText) return "Chưa có thông tin phần thưởng";
+  const lines = rewardsText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^•\s*/, "").trim())
+    .filter(Boolean);
+
+  if (lines.length > 1) {
+    return lines.join(", ");
+  }
+  return lines[0] || "Chưa có thông tin phần thưởng";
+}
 
 /**
- * Creates a Discord Embed for Wuthering Waves Redeem Codes (Modern, minimal & elegant)
+ * Tạo Discord Embed và Button cho mã code Wuthering Waves (Chuẩn phong cách tối giản HoYoverse)
  * @param {Object} codeObj
- * @returns {Promise<EmbedBuilder>}
+ * @returns {Promise<{ embed: EmbedBuilder, components: ActionRowBuilder[] }>}
  */
 async function createWuwaCodeEmbed(codeObj) {
   const emojiId = WUWA_EMOJI_ID || "1536322393411424286";
-  const emojiMention = `<:wutheringwave:${emojiId}>`;
-  const defaultIconUrl = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
+  const gameEmojiStr = `<:wutheringwave:${emojiId}>`;
+  const iconUrl = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
 
-  // Translate duration string to Vietnamese
-  const durationVN = await translateDurationToVN(codeObj.duration);
-  const rewardsContent = codeObj.rewardsText || "• Chưa có thông tin phần thưởng";
+  // Dịch thời hạn sang tiếng Việt
+  let durationVN = await translateDurationToVN(codeObj.duration);
+  durationVN = durationVN
+    .replace(/^Hạn dùng:\s*/i, "")
+    .replace(/\|\s*Hạn dùng:\s*/i, "| ")
+    .trim() || "Còn hiệu lực";
+
+  if (durationVN.toLowerCase().includes("vô thời hạn")) {
+    durationVN = "Vô thời hạn (Còn hiệu lực)";
+  }
+
+  const formattedRewards = formatRewards(codeObj.rewardsText);
+
+  let serverVN = codeObj.server || "Tất cả";
+  if (serverVN.toLowerCase() === "all") serverVN = "Tất cả";
 
   const embed = new EmbedBuilder()
-    .setTitle("🎁 WUTHERING WAVES — REDEEM CODE")
+    .setTitle(`${gameEmojiStr} Mã code mới cho Wuthering Waves!`)
     .setColor("#00D2FF")
-    .setThumbnail(ASTRITE_ICON_URL)
+    .setThumbnail(iconUrl)
     .setDescription(
-      `### ${emojiMention} \`${codeObj.code}\`\n\n` +
-      `**Phần thưởng:**\n${rewardsContent}\n\n` +
-      `**Trạng thái:** \`${durationVN}\``
+      `\`${codeObj.code}\`\n` +
+      `└ ${formattedRewards}\n\n` +
+      `• Máy chủ: ${serverVN} | Trạng thái: ${durationVN}`
     )
     .setFooter({
       text: "Wuthering Waves • Giftcode Alert",
-      iconURL: defaultIconUrl,
+      iconURL: iconUrl,
     })
     .setTimestamp();
 
-  return embed;
+  // Bỏ hoàn toàn hàng nút bấm - Người dùng chạm trực tiếp vào mã code để sao chép
+  return { embed, components: [] };
 }
 
-/**
- * Creates a Warning Discord Embed for Codes Expiring in 24 Hours
- * @param {Array<Object>} expiringCodes
- * @returns {Promise<EmbedBuilder>}
- */
-async function createWuwaExpiringSoonEmbed(expiringCodes) {
-  const emojiId = WUWA_EMOJI_ID || "1536322393411424286";
-  const emojiMention = `<:wutheringwave:${emojiId}>`;
-  const defaultIconUrl = `https://cdn.discordapp.com/emojis/${emojiId}.png`;
-
-  const lines = [];
-  for (const c of expiringCodes) {
-    const durationVN = await translateDurationToVN(c.duration);
-    lines.push(`• **\`${c.code}\`** ➔ \`${durationVN}\``);
-  }
-
-  const embed = new EmbedBuilder()
-    .setTitle("⏰ CẢNH BÁO: CODE SẮP HẾT HẠN (24H)")
-    .setDescription(
-      `${emojiMention} Các mã quà tặng dưới đây **sắp hết hạn trong 24 giờ tới**. Hãy nhanh chóng nhập vào tài khoản nhé:\n\n` +
-      lines.join("\n")
-    )
-    .setColor("#FF4757")
-    .setThumbnail(ASTRITE_ICON_URL)
-    .setFooter({
-      text: "Wuthering Waves • Expiry Alert",
-      iconURL: defaultIconUrl,
-    })
-    .setTimestamp();
-
-  return embed;
-}
-
-module.exports = { createWuwaCodeEmbed, createWuwaExpiringSoonEmbed, ASTRITE_ICON_URL };
+module.exports = { createWuwaCodeEmbed };

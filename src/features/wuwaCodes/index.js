@@ -1,10 +1,14 @@
 // src/features/wuwaCodes/index.js
 const { WebhookClient } = require("discord.js");
 const { scrapeWuwaCodes } = require("./wuwaScraper");
-const { createWuwaCodeEmbed, createWuwaExpiringSoonEmbed } = require("./embedBuilder");
-const { isExpiringWithin24Hours } = require("./wuwaUtils");
+const { createWuwaCodeEmbed } = require("./embedBuilder");
 const WuwaCodeModel = require("../../database/models/WuwaCode");
 const { WUWA_CODES_CHANNEL_ID, WUWA_ROLE_ID, WEBHOOK_WUWA_CODES } = require("../../config/env");
+
+// Kênh cố định gửi code WuWa (Kênh Demo đang thử nghiệm).
+// TUYỆT ĐỐI KHÔNG GỬI VÀO KÊNH CHÍNH (1528768068581457930) CHO ĐẾN KHI NGƯỜI DÙNG YÊU CẦU!
+const WUWA_DEMO_CHANNEL_ID = "1547084091868844142";
+const BLOCKED_PRODUCTION_CHANNEL_ID = "1528768068581457930";
 
 // In-memory fallback set for known codes if MongoDB is not connected
 const knownCodesSet = new Set();
@@ -15,15 +19,25 @@ const knownCodesSet = new Set();
  * @param {import("discord.js").TextChannel} channel
  * @param {import("discord.js").EmbedBuilder} embed
  * @param {string|null} roleMention
+ * @param {import("discord.js").ActionRowBuilder[]} components
  * @returns {Promise<boolean>}
  */
-async function sendWuwaNotification(client, channel, embed, roleMention) {
+async function sendWuwaNotification(client, channel, embed, roleMention, components = []) {
+  // Chốt an toàn: Tuyệt đối không gửi vào kênh chính 1528768068581457930
+  if (channel && channel.id === BLOCKED_PRODUCTION_CHANNEL_ID) {
+    console.error(`⛔ [BẢO VỆ TUYỆT ĐỐI] Đã chặn gửi code WuWa vào kênh chính (${BLOCKED_PRODUCTION_CHANNEL_ID})! Chuyển hướng sang Demo (${WUWA_DEMO_CHANNEL_ID}).`);
+    const demoChannel = await client.channels.fetch(WUWA_DEMO_CHANNEL_ID).catch(() => null);
+    if (demoChannel) channel = demoChannel;
+    else return false;
+  }
+
   if (WEBHOOK_WUWA_CODES) {
     try {
       const webhookClient = new WebhookClient({ url: WEBHOOK_WUWA_CODES });
       await webhookClient.send({
         content: roleMention || undefined,
         embeds: [embed],
+        components,
       });
       return true;
     } catch (whErr) {
@@ -35,6 +49,7 @@ async function sendWuwaNotification(client, channel, embed, roleMention) {
     await channel.send({
       content: roleMention || undefined,
       embeds: [embed],
+      components,
     });
     return true;
   }
@@ -91,9 +106,10 @@ async function checkAndNotifyWuwaCodes(client) {
       return;
     }
 
-    // 4. Fetch recent 50 messages in Discord notification channel
-    const channel = await client.channels.fetch(WUWA_CODES_CHANNEL_ID).catch((err) => {
-      console.error(`❌ [WuWa Code Watcher] Không thể fetch channel (${WUWA_CODES_CHANNEL_ID}):`, err.message);
+    // 4. Fetch recent 50 messages in Discord notification channel (Luôn cố định kênh Demo 1547084091868844142)
+    const targetChannelId = WUWA_DEMO_CHANNEL_ID;
+    const channel = await client.channels.fetch(targetChannelId).catch((err) => {
+      console.error(`❌ [WuWa Code Watcher] Không thể fetch channel (${targetChannelId}):`, err.message);
       return null;
     });
 
@@ -103,35 +119,44 @@ async function checkAndNotifyWuwaCodes(client) {
         const recentMessages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
         if (recentMessages && recentMessages.size > 0) {
           recentMessages.forEach((msg) => {
+            // 1. Quét nội dung tin nhắn thường
+            if (msg.content) {
+              const contentMatches = msg.content.matchAll(/(`|\*\*)([A-Z0-9]{5,25})(`|\*\*)/g);
+              for (const cm of contentMatches) {
+                codesInChannel.add(cm[2].toUpperCase());
+              }
+            }
+
+            // 2. Quét qua Embeds (Title, Description, Fields)
             if (msg.embeds && msg.embeds.length > 0) {
               for (const emb of msg.embeds) {
-                if (emb.description) {
-                  const match = emb.description.match(/`([A-Z0-9]{5,25})`/);
-                  if (match) codesInChannel.add(match[1]);
+                const text = `${emb.title || ""} ${emb.description || ""}`;
+                const embedMatches = text.matchAll(/(`|\*\*)([A-Z0-9]{5,25})(`|\*\*)/g);
+                for (const em of embedMatches) {
+                  codesInChannel.add(em[2].toUpperCase());
                 }
                 if (emb.fields) {
                   for (const f of emb.fields) {
-                    if (f.name && f.name.includes("🔑 Mã Code:")) {
-                      const match = f.name.match(/`([A-Z0-9]{5,25})`/);
-                      if (match) codesInChannel.add(match[1]);
-                    }
-                    if (f.value) {
-                      const matches = f.value.match(/`([A-Z0-9]{5,25})`/g);
-                      if (matches) {
-                        for (const m of matches) {
-                          codesInChannel.add(m.replace(/`/g, "").trim());
-                        }
-                      }
+                    const fieldMatches = `${f.name || ""} ${f.value || ""}`.matchAll(/(`|\*\*)([A-Z0-9]{5,25})(`|\*\*)/g);
+                    for (const fm of fieldMatches) {
+                      codesInChannel.add(fm[2].toUpperCase());
                     }
                   }
                 }
               }
             }
-            if (msg.content) {
-              const matches = msg.content.match(/`([A-Z0-9]{5,25})`/g);
-              if (matches) {
-                for (const m of matches) {
-                  codesInChannel.add(m.replace(/`/g, "").trim());
+
+            // 3. Quét qua nút bấm (Button customId & Label)
+            if (msg.components && msg.components.length > 0) {
+              for (const row of msg.components) {
+                for (const comp of row.components || []) {
+                  if (comp.customId && comp.customId.startsWith("copy_wuwa_")) {
+                    codesInChannel.add(comp.customId.replace("copy_wuwa_", "").trim().toUpperCase());
+                  }
+                  if (comp.label) {
+                    const labelMatch = comp.label.match(/([A-Z0-9]{5,25})/);
+                    if (labelMatch) codesInChannel.add(labelMatch[1].toUpperCase());
+                  }
                 }
               }
             }
@@ -142,17 +167,21 @@ async function checkAndNotifyWuwaCodes(client) {
       }
     }
 
-    // 5. Notify any missing code (whether web or manual)!
+    // 5. Notify ONLY brand new codes (Không gửi code cũ trước ngày hôm nay)
     for (const [codeStr, codeObj] of allActiveCodesMap.entries()) {
       const isAlreadyInChannel = codesInChannel.has(codeStr);
+      const isAlreadyKnown = knownCodesSet.has(codeStr);
       let existingDoc = null;
 
       try {
         existingDoc = await WuwaCodeModel.findOne({ code: codeStr });
       } catch (dbErr) {}
 
-      if (!isAlreadyInChannel) {
-        console.log(`🎉 [WuWa Code Watcher] PHÁT HIỆN CODE CẦN ĐĂNG KÊNH (${codeObj.isManual ? "THỦ CÔNG" : "WEB"}): "${codeStr}"!`);
+      // CHỈ GỬI THÔNG BÁO NẾU:
+      // 1. Code chưa từng xuất hiện trong kênh Discord (!isAlreadyInChannel)
+      // 2. VÀ Code KHÔNG PHẢI là code cũ trước thời điểm hôm nay (!isAlreadyKnown && (!existingDoc || !existingDoc.notified))
+      if (!isAlreadyInChannel && !isAlreadyKnown && (!existingDoc || !existingDoc.notified)) {
+        console.log(`🎉 [WuWa Code Watcher] PHÁT HIỆN CODE MỚI TINH (${codeObj.isManual ? "THỦ CÔNG" : "WEB"}): "${codeStr}"!`);
 
         // Save/Update DB & Memory
         knownCodesSet.add(codeStr);
@@ -176,44 +205,27 @@ async function checkAndNotifyWuwaCodes(client) {
 
         // Send Notification via Webhook or Channel
         try {
-          const embed = await createWuwaCodeEmbed(codeObj);
-          const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
-          await sendWuwaNotification(client, channel, embed, roleMention);
-          console.log(`✅ Đã gửi thông báo code "${codeStr}" tới kênh (${WUWA_CODES_CHANNEL_ID}) kèm tag Role (${WUWA_ROLE_ID})!`);
+          const { embed, components } = await createWuwaCodeEmbed(codeObj);
+          // Tuyệt đối không ping role trong kênh demo
+          const roleMention = null;
+          await sendWuwaNotification(client, channel, embed, roleMention, components);
+          codesInChannel.add(codeStr);
+          console.log(`✅ Đã gửi thông báo code mới "${codeStr}" tới kênh demo (${targetChannelId})!`);
         } catch (sendErr) {
           console.error(`❌ Lỗi gửi tin nhắn cho code "${codeStr}":`, sendErr.message);
         }
       } else {
-        // Code already present in channel
+        // Đã biết hoặc đã có trong kênh -> cập nhật DB & Set bộ nhớ để không bao giờ gửi lại
+        knownCodesSet.add(codeStr);
+        if (existingDoc && !existingDoc.notified) {
+          existingDoc.notified = true;
+          await existingDoc.save().catch(() => {});
+        }
         if (existingDoc && existingDoc.duration !== codeObj.duration && !codeObj.isManual) {
           existingDoc.duration = codeObj.duration;
           await existingDoc.save().catch(() => {});
         }
       }
-    }
-
-    // 6. Check for codes expiring within 24 hours that haven't been alerted yet
-    try {
-      const expiringCodesToNotify = [];
-      for (const [codeStr, codeObj] of allActiveCodesMap.entries()) {
-        if (isExpiringWithin24Hours(codeObj.duration)) {
-          let doc = await WuwaCodeModel.findOne({ code: codeStr }).catch(() => null);
-          if (doc && !doc.notifiedExpiringSoon) {
-            expiringCodesToNotify.push(codeObj);
-            doc.notifiedExpiringSoon = true;
-            await doc.save().catch(() => {});
-          }
-        }
-      }
-
-      if (expiringCodesToNotify.length > 0 && channel) {
-        console.log(`⚠️ [WuWa Code Watcher] PHÁT HIỆN ${expiringCodesToNotify.length} CODE SẮP HẾT HẠN TRONG 24H!`);
-        const expireEmbed = await createWuwaExpiringSoonEmbed(expiringCodesToNotify);
-        const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
-        await sendWuwaNotification(client, channel, expireEmbed, roleMention ? `🔔 ${roleMention} **NHẮC NHỞ CODE SẮP HẾT HẠN!**` : null);
-      }
-    } catch (expireCheckErr) {
-      console.error("⚠️ Lỗi kiểm tra code sắp hết hạn:", expireCheckErr.message);
     }
   } catch (error) {
     console.error("❌ [WuWa Code Watcher] Lỗi trong quá trình kiểm tra code:", error);
@@ -388,9 +400,38 @@ async function deleteManualCode(identifier) {
  * @param {import("discord.js").Client} client
  */
 function initWuwaCodeWatcher(client) {
-  console.log(`🚀 [WuWa Code Watcher] Đã kích hoạt theo dõi Code tự động cho kênh (${WUWA_CODES_CHANNEL_ID})!`);
+  console.log(`🚀 [WuWa Code Watcher] Đã kích hoạt theo dõi Code tự động cố định cho kênh demo (${WUWA_DEMO_CHANNEL_ID})!`);
 
-  // Hydrate known codes from MongoDB Atlas on startup
+  // 1. Quét mốc khởi động ban đầu (Baseline Initial Lock)
+  // Toàn bộ code đang có trên web hiện tại sẽ được đánh dấu đã biết và lưu vào DB (notified: true)
+  // để bot KHÔNG BAO GIỜ gửi lại các code cũ trước thời điểm hôm nay
+  scrapeWuwaCodes(client).then(async (allScraped) => {
+    try {
+      if (allScraped && allScraped.length > 0) {
+        for (const c of allScraped) {
+          knownCodesSet.add(c.code);
+          await WuwaCodeModel.findOneAndUpdate(
+            { code: c.code },
+            {
+              code: c.code,
+              server: c.server || "All",
+              rewards: c.rewards || [],
+              rewardsText: c.rewardsText || "• Không rõ phần thưởng",
+              duration: c.duration || "Valid until: Unknown",
+              isActive: true,
+              notified: true,
+            },
+            { upsert: true }
+          ).catch(() => {});
+        }
+        console.log(`🔒 [WuWa Code Watcher] Đã khóa mốc ban đầu (${allScraped.length} code cũ sẽ không bị gửi lại).`);
+      }
+    } catch (baselineErr) {
+      console.error("⚠️ Lỗi chốt baseline code cũ:", baselineErr.message);
+    }
+  }).catch(() => {});
+
+  // 2. Nạp toàn bộ code đã biết từ MongoDB Atlas
   WuwaCodeModel.find({}).then((docs) => {
     if (docs && docs.length > 0) {
       for (const doc of docs) {
@@ -400,12 +441,12 @@ function initWuwaCodeWatcher(client) {
     }
   }).catch(() => {});
 
-  // Run initial check after 5 seconds
+  // Chạy kiểm tra sau 8 giây khi khởi động
   setTimeout(() => {
     checkAndNotifyWuwaCodes(client);
-  }, 5000);
+  }, 8000);
 
-  // Set recurring check every 30 minutes (1,800,000 ms)
+  // Set định kỳ kiểm tra mỗi 30 phút (1,800,000 ms)
   setInterval(() => {
     checkAndNotifyWuwaCodes(client);
   }, 30 * 60 * 1000);

@@ -268,6 +268,17 @@ client.on(Events.GuildCreate, async (guild) => {
   }
 });
 
+// Interaction Event Handler (Hỗ trợ nút bấm Sao chép nhanh mã code Wuthering Waves)
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isButton() && interaction.customId.startsWith("copy_wuwa_")) {
+    const code = interaction.customId.replace("copy_wuwa_", "");
+    return interaction.reply({
+      content: `📋 **Mã quà tặng Wuthering Waves:**\n\`${code}\`\n\n💡 *Bấm vào mã trên để sao chép nhanh, sau đó mở game vào **Cài đặt ➔ Cài đặt khác ➔ Mã đổi quà** để nhận nhé!*`,
+      flags: 64, // Ephemeral: Chỉ người bấm mới thấy
+    });
+  }
+});
+
 // Message Event Handler
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
@@ -347,6 +358,33 @@ client.on(Events.MessageCreate, async (message) => {
           const { embed, components } = createLivestreamCodeMessage(streamData);
           await targetChannel.send({ embeds: [embed], components });
           const reply = await message.reply(`✅ Đã gửi mẫu livestream **${streamData.game.toUpperCase()}** vào kênh demo <#${targetChannelId}>!`).catch(() => null);
+          if (reply) {
+            setTimeout(() => reply.delete().catch(() => {}), 4000);
+            setTimeout(() => message.delete().catch(() => {}), 4000);
+          }
+        }
+      }
+      return;
+    }
+
+    // 0.3 Lệnh Admin gửi tin nhắn mẫu Code Wuthering Waves xem trước giao diện (!testwuwa)
+    if (message.content.trim().toLowerCase().startsWith("!testwuwa")) {
+      const { ADMIN_IDS, ADMIN_ID, WUWA_CODES_CHANNEL_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const { createWuwaCodeEmbed } = require("./src/features/wuwaCodes/embedBuilder");
+        const targetChannelId = WUWA_CODES_CHANNEL_ID || "1547084091868844142";
+        const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
+
+        if (targetChannel && targetChannel.isTextBased()) {
+          const sampleWuwaCode = {
+            code: "SHOREKEEPER",
+            server: "Tất cả",
+            rewardsText: "• Astrite x100\n• Shell Credit x10000\n• Premium Sealed Tube x2",
+            duration: "Còn hiệu lực",
+          };
+          const { embed, components } = await createWuwaCodeEmbed(sampleWuwaCode);
+          await targetChannel.send({ embeds: [embed], components });
+          const reply = await message.reply(`✅ Đã gửi mẫu code Wuthering Waves giao diện mới vào kênh demo <#${targetChannelId}>!`).catch(() => null);
           if (reply) {
             setTimeout(() => reply.delete().catch(() => {}), 4000);
             setTimeout(() => message.delete().catch(() => {}), 4000);

@@ -19,7 +19,7 @@ const ALLOWED_GUILD_IDS = (process.env.ALLOWED_GUILD_IDS || "1389834422773219338
 const PROD_CHANNELS = {
   WORDCHAIN: "1450065511231520778",      // Kênh Nối Từ chính
   WORDSCRAMBLE: "1535705241620717720",   // Kênh Sắp Xếp Từ chính
-  WUWA_CODES: "1528768068581457930",     // Kênh Săn Code WuWa chính
+  WUWA_CODES: "1547084091868844142",     // Kênh Săn Code WuWa (Kênh Demo đang test)
   HOYO_CODES: "1528768068581457930",     // Kênh Săn Code HoYoverse chính thức
   RULES: "1450073214620405903",          // Kênh Luật chơi chính
 };

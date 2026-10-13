@@ -17,13 +17,13 @@ function createMasterHelpEmbed() {
       {
         name: `${wuwaEmoji} WUTHERING WAVES CODES`,
         value:
-          `📌 **Kênh sử dụng:** Kênh thông báo Code (<#${WUWA_CODES_CHANNEL_ID || "1528768068581457930"}>)\n` +
+          `📌 **Kênh sử dụng:** Kênh thông báo Code (<#${WUWA_CODES_CHANNEL_ID || "1547084091868844142"}>)\n` +
           `• \`!testcode\` / \`!checkcode\` *(Admin)* ➔ Quét trang Fandom Wiki tìm code mới ngay lập tức.\n` +
           `• \`!danhsachcode\` / \`!listcode\` *(Admin)* ➔ Xem danh sách toàn bộ code + Hướng dẫn Quản lý.\n` +
           `• \`!themcode <CODE> [Phần thưởng] [\| Hạn]\` *(Admin)* ➔ Thêm code thủ công & thông báo ngay.\n` +
           `• \`!suacode <ID_HOẶC_MÃ> <Quà mới> [\| Hạn mới]\` *(Admin)* ➔ Sửa thông tin code đã lưu.\n` +
           `• \`!xoacode <ID_HOẶC_MÃ>\` *(Admin)* ➔ Xóa code khỏi hệ thống.\n` +
-          `• \`!testexpire\` *(Admin)* ➔ Thử nghiệm gửi tin nhắn cảnh báo code sắp hết hạn trong 24h.`,
+          `• \`!testwuwa\` *(Admin)* ➔ Gửi tin nhắn mẫu code Wuthering Waves xem trước giao diện.`,
         inline: false,
       },
       {

@@ -6,8 +6,7 @@ const {
   updateManualCode,
   deleteManualCode,
 } = require("./index");
-const { createWuwaExpiringSoonEmbed } = require("./embedBuilder");
-const { isExpiringWithin24Hours, translateDurationToVN } = require("./wuwaUtils");
+const { translateDurationToVN } = require("./wuwaUtils");
 const WuwaCodeModel = require("../../database/models/WuwaCode");
 const { EmbedBuilder } = require("discord.js");
 const { ADMIN_IDS, ADMIN_ID, WUWA_ROLE_ID } = require("../../config/env");
@@ -16,7 +15,7 @@ const isAdmin = (userId) => (ADMIN_IDS && ADMIN_IDS.length > 0) ? ADMIN_IDS.incl
 
 /**
  * Handle chat commands for Wuthering Waves codes
- * (!testcode, !checkcode, !themcode, !addcode, !testexpire, !testhethan, !danhsachcode, !listcode, !suacode, !xoacode)
+ * (!testcode, !checkcode, !themcode, !addcode, !danhsachcode, !listcode, !suacode, !xoacode)
  * Restricted to Admins only
  * @param {import("discord.js").Client} client
  */
@@ -29,13 +28,12 @@ function onWuwaCodeMessage(client) {
 
     // Check command prefixes
     const isTestCmd = lowerContent === "!testcode" || lowerContent === "!checkcode";
-    const isExpireCmd = lowerContent === "!testexpire" || lowerContent === "!testhethan";
     const isAddCmd = lowerContent.startsWith("!themcode") || lowerContent.startsWith("!addcode");
     const isListCmd = lowerContent === "!danhsachcode" || lowerContent === "!listcode";
     const isEditCmd = lowerContent.startsWith("!suacode") || lowerContent.startsWith("!editcode");
     const isDeleteCmd = lowerContent.startsWith("!xoacode") || lowerContent.startsWith("!deletecode");
 
-    if (!isTestCmd && !isExpireCmd && !isAddCmd && !isListCmd && !isEditCmd && !isDeleteCmd) return;
+    if (!isTestCmd && !isAddCmd && !isListCmd && !isEditCmd && !isDeleteCmd) return;
 
     // Admin Permission Check
     if (!isAdmin(message.author.id)) {
@@ -60,51 +58,7 @@ function onWuwaCodeMessage(client) {
       return;
     }
 
-    // Command 2: !testexpire or !testhethan (Scans actual DB codes for 24h expiration with demo fallback)
-    if (isExpireCmd) {
-      try {
-        let activeDocs = [];
-        try {
-          activeDocs = await WuwaCodeModel.find({ isActive: true });
-        } catch (dbErr) {}
-
-        const expiringCodes = [];
-        for (const doc of activeDocs) {
-          if (isExpiringWithin24Hours(doc.duration)) {
-            expiringCodes.push({
-              code: doc.code,
-              duration: doc.duration,
-            });
-          }
-        }
-
-        const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : `<@${message.author.id}>`;
-
-        if (expiringCodes.length > 0) {
-          const embed = await createWuwaExpiringSoonEmbed(expiringCodes);
-          await message.reply({
-            content: `⚠️ Phát hiện **${expiringCodes.length} code trong hệ thống** sắp hết hạn trong 24h!\n${roleMention}`,
-            embeds: [embed],
-          });
-        } else {
-          const demoExpiringCodes = [
-            { code: "HEARTOFSWORD", duration: "Valid until: August 11, 2026 08:59 (PT)" },
-            { code: "ETERNALFLAME", duration: "Valid until: August 11, 2026 08:59 (PT)" },
-          ];
-          const embed = await createWuwaExpiringSoonEmbed(demoExpiringCodes);
-          await message.reply({
-            content: `ℹ️ Hiện tại chưa có code nào trong DB sắp hết hạn trong 24h. Gửi tin nhắn mẫu thử nghiệm giao diện:\n${roleMention}`,
-            embeds: [embed],
-          });
-        }
-      } catch (err) {
-        console.error("❌ Error in !testexpire command:", err);
-        await message.reply(`❌ Lỗi khi gửi demo hết hạn: ${err.message}`);
-      }
-      return;
-    }
-
-    // Command 3: !danhsachcode or !listcode (List all saved codes & display CRUD usage guide)
+    // Command 2: !danhsachcode or !listcode (List all saved codes & display CRUD usage guide)
     if (isListCmd) {
       try {
         const codes = await listManualCodes();
