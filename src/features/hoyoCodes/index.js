@@ -35,23 +35,33 @@ async function checkAndNotifyHoyoCodes(client) {
       return null;
     });
 
-    // 3. Quét 50 tin nhắn gần nhất trong kênh để không bao giờ gửi trùng
+    // 3. Quét tối đa 100 tin nhắn gần nhất trong kênh để không bao giờ gửi trùng
     const codesInChannel = new Set();
     if (channel && channel.isTextBased()) {
       try {
-        const recentMessages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+        const recentMessages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
         if (recentMessages && recentMessages.size > 0) {
           recentMessages.forEach((msg) => {
-            // Quét qua embeds
+            // Quét qua nội dung tin nhắn thường
+            if (msg.content) {
+              const contentMatches = msg.content.matchAll(/(`|\*\*)([A-Za-z0-9_-]{4,40})(`|\*\*)/g);
+              for (const cm of contentMatches) {
+                codesInChannel.add(cm[2].toUpperCase());
+              }
+            }
+
+            // Quét qua các Embeds (tiêu đề và mô tả)
             if (msg.embeds && msg.embeds.length > 0) {
               for (const emb of msg.embeds) {
-                if (emb.description) {
-                  const match = emb.description.match(/(`|\*\*)([A-Za-z0-9_-]{4,40})(`|\*\*)/);
-                  if (match) codesInChannel.add(match[2].toUpperCase());
+                const targetText = `${emb.title || ""} ${emb.description || ""}`;
+                const matches = targetText.matchAll(/(`|\*\*)([A-Za-z0-9_-]{4,40})(`|\*\*)/g);
+                for (const m of matches) {
+                  codesInChannel.add(m[2].toUpperCase());
                 }
               }
             }
-            // Quét qua các button link để bắt trọn vẹn 100% mã code
+
+            // Quét qua các Buttons (URL và Label) để bắt trọn vẹn 100% mã code
             if (msg.components && msg.components.length > 0) {
               for (const row of msg.components) {
                 if (row.components) {
@@ -60,6 +70,10 @@ async function checkAndNotifyHoyoCodes(client) {
                       const urlMatch = comp.url.match(/code=([A-Za-z0-9_-]+)/i);
                       if (urlMatch) codesInChannel.add(urlMatch[1].toUpperCase());
                     }
+                    if (comp.label) {
+                      const labelMatch = comp.label.match(/([A-Za-z0-9_-]{4,40})/);
+                      if (labelMatch) codesInChannel.add(labelMatch[1].toUpperCase());
+                    }
                   }
                 }
               }
@@ -67,7 +81,7 @@ async function checkAndNotifyHoyoCodes(client) {
           });
         }
       } catch (fetchErr) {
-        console.error("⚠️ Không thể đọc tin nhắn cũ trong kênh demo:", fetchErr.message);
+        console.error("⚠️ Không thể đọc tin nhắn cũ trong kênh:", fetchErr.message);
       }
     }
 
