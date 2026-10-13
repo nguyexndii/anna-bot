@@ -25,7 +25,7 @@ const UPDATE_KEYWORDS = [
   "sanctuary of ink",
 ];
 
-// Từ khóa loại trừ bài rác
+// Từ khóa loại trừ bài rác, bảo trì nạp thẻ, store
 const EXCLUDE_KEYWORDS = [
   "birthday",
   "sinh nhật",
@@ -37,7 +37,33 @@ const EXCLUDE_KEYWORDS = [
   "dự thi",
   "survey",
   "khảo sát",
+  "playstation",
+  "ps4",
+  "ps5",
+  "payment",
+  "thanh toán",
+  "top-up",
+  "nạp",
+  "cửa hàng",
+  "soundtrack",
+  "ost",
+  "album",
 ];
+
+/**
+ * Kiểm tra xem bài viết có xuất bản từ hôm nay trở đi (GMT+7) hay không
+ * @param {Date|string|number} date
+ */
+function isPublishedToday(date) {
+  if (!date) return false;
+  const postDate = new Date(date);
+  if (isNaN(postDate.getTime())) return false;
+
+  const postDateStr = postDate.toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }); // YYYY-MM-DD
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" });
+
+  return postDateStr >= todayStr;
+}
 
 function isUpdatePost(title) {
   const lower = (title || "").toLowerCase();
@@ -61,6 +87,13 @@ async function fetchHoyoverseUpdates(gameKey, gId) {
     for (const item of list) {
       const post = item.post;
       if (!post) continue;
+
+      const publishedAt = new Date(post.created_at * 1000);
+      // Chỉ nhận bài viết xuất bản từ hôm nay trở đi
+      if (!isPublishedToday(publishedAt)) {
+        continue;
+      }
+
       const title = post.subject || "";
       if (isUpdatePost(title)) {
         const postId = String(post.post_id);
@@ -93,7 +126,7 @@ async function fetchHoyoverseUpdates(gameKey, gId) {
           bannerUrl,
           postUrl,
           btnText: "Xem bài gốc HoYoLAB",
-          publishedAt: new Date(post.created_at * 1000 || Date.now()),
+          publishedAt,
         });
       }
     }
@@ -118,6 +151,12 @@ async function fetchWuwaUpdates() {
     const updates = [];
 
     for (const item of newsList) {
+      const publishedAt = item.date ? new Date(item.date) : null;
+      // Chỉ nhận bài xuất bản từ hôm nay
+      if (!publishedAt || !isPublishedToday(publishedAt)) {
+        continue;
+      }
+
       const title = item.title || "";
       if (isUpdatePost(title)) {
         const articleId = String(item.id || item.articleId || title);
@@ -132,7 +171,7 @@ async function fetchWuwaUpdates() {
           bannerUrl,
           postUrl,
           btnText: "Xem bài gốc Kuro Games",
-          publishedAt: item.date ? new Date(item.date) : new Date(),
+          publishedAt,
         });
       }
     }
@@ -155,19 +194,8 @@ async function fetchEndfieldUpdates() {
     const html = res.data || "";
     const updates = [];
 
-    // Tìm các tin tức bản cập nhật trong trang news
-    if (html.includes("Sanctuary of Ink") || html.includes("Core Chapter") || isUpdatePost(html)) {
-      updates.push({
-        game: "endfield",
-        articleId: "endfield_core_1_6",
-        title: "Arknights: Endfield — Chi tiết Core Chapter 1.6 [Sanctuary of Ink]",
-        content: "Arknights: Endfield Core Chapter Version 1.6 Sanctuary of Ink AIC Factory Auto-Farmer Top View Blueprint Steam Launch",
-        bannerUrl: DEFAULT_BANNERS.endfield,
-        postUrl: "https://endfield.gryphline.com/news",
-        btnText: "Xem trên SKPORT / Gryphline",
-        publishedAt: new Date(),
-      });
-    }
+    // Chỉ lấy bài nếu có tin tức bản cập nhật xuất bản từ hôm nay
+    // Lưu ý: SKPORT news static page
     return updates;
   } catch (err) {
     console.warn("[GachaUpdates] Lỗi fetch Endfield:", err.message);

@@ -31,6 +31,11 @@ async function checkAndPublishGachaUpdates(client) {
     console.log("[GachaUpdates] 🔄 Bắt đầu kiểm tra bản cập nhật mới cho 5 tựa game...");
     const latestUpdates = await fetchAllGachaUpdates();
 
+    if (latestUpdates.length === 0) {
+      console.log("[GachaUpdates] ℹ️ Không phát hiện bài cập nhật nào xuất bản từ hôm nay. Hệ thống sẽ tiếp tục theo dõi.");
+      return;
+    }
+
     for (const update of latestUpdates) {
       try {
         // Kiểm tra xem bài viết đã từng được đăng chưa
