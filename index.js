@@ -317,165 +317,225 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // 0.1 Lệnh Admin ép quét code HoYoverse tức thì (!checkhoyo)
-    if (message.content.trim().toLowerCase() === "!checkhoyo") {
+    const lowerRaw = message.content.trim().toLowerCase();
+
+    // 0.1 Lệnh Admin ép quét code HoYoverse tức thì (!checkhoyo, !acheckhoyo)
+    if (lowerRaw === "!checkhoyo" || lowerRaw === "!acheckhoyo") {
       const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
-        const reply = await message.reply("🔄 Đang quét mã code HoYoverse (Genshin, HSR, ZZZ) ngay lập tức...").catch(() => null);
+        await message.channel.send("🔄 **[Hoyo Watcher]** Đang quét mã code HoYoverse (Genshin, HSR, ZZZ) ngay lập tức...");
         const { checkAndNotifyHoyoCodes } = require("./src/features/hoyoCodes");
         await checkAndNotifyHoyoCodes(client);
-        if (reply) {
-          setTimeout(() => reply.delete().catch(() => {}), 4000);
-          setTimeout(() => message.delete().catch(() => {}), 4000);
-        }
       }
       return;
     }
 
-    // 0.2 Lệnh Admin gửi tin nhắn mẫu Livestream để xem trước giao diện (!testlive [zzz|hsr|genshin|wuwa])
-    if (message.content.trim().toLowerCase().startsWith("!testlive")) {
-      const { ADMIN_IDS, ADMIN_ID, HOYO_CODES_CHANNEL_ID } = require("./src/config/env");
+    // 0.2 Lệnh Admin gửi tin nhắn mẫu Livestream Special Program (!testlive, !atestlive)
+    // GỬI TRỰC TIẾP VÀO KÊNH BẠN ĐANG DÙNG LỆNH
+    if (lowerRaw.startsWith("!testlive") || lowerRaw.startsWith("!atestlive")) {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
         const parts = message.content.trim().split(/\s+/);
         const gameArg = (parts[1] || "zzz").toLowerCase();
         const { createLivestreamCodeMessage } = require("./src/features/hoyoCodes/embedBuilder");
         const { fetchLivestreamBanner } = require("./src/features/hoyoCodes/hoyoScraper");
 
-        const targetChannelId = HOYO_CODES_CHANNEL_ID || "1547084091868844142";
-        const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
+        let embed, components;
 
-        if (targetChannel && targetChannel.isTextBased()) {
-          let embed, components, gameLabel;
-
-          if (gameArg === "wuwa" || gameArg === "ww") {
-            const { createWuwaLivestreamMessage } = require("./src/features/wuwaCodes/embedBuilder");
-            const { fetchWuwaLivestreamInfo } = require("./src/features/wuwaCodes/wuwaScraper");
-            const liveInfo = await fetchWuwaLivestreamInfo();
-            const sampleWuwaLive = {
-              version: "3.7",
-              bannerUrl: "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/slide-picture/087sw5peq5mquvlulz.png",
-              streamYoutube: "https://youtu.be/xLWZ-bApa2c?si=JdBiUsz4qL0Sxwvg",
-              streamTwitch: "https://www.twitch.tv/wuthering_waves",
-              time: "Phát sóng ngày 19/09/2026",
+        if (gameArg === "wuwa" || gameArg === "ww") {
+          const { createWuwaLivestreamMessage } = require("./src/features/wuwaCodes/embedBuilder");
+          const sampleWuwaLive = {
+            version: "3.7",
+            bannerUrl: "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/slide-picture/087sw5peq5mquvlulz.png",
+            streamYoutube: "https://youtu.be/xLWZ-bApa2c?si=JdBiUsz4qL0Sxwvg",
+            streamTwitch: "https://www.twitch.tv/wuthering_waves",
+            time: "Phát sóng ngày 19/09/2026",
+            codes: [
+              { code: "FALLINGSANCTUM", rewardsText: "• Astrite x100\n• Premium Resonance Potion x2\n• Advanced Inhaler x2", duration: "Đã hết hạn" },
+              { code: "WAKINGMOON", rewardsText: "• Astrite x100\n• Advanced Sealed Tube x2\n• Premium Tuner x10", duration: "Đã hết hạn" },
+              { code: "FINDSENTINEL", rewardsText: "• Astrite x100\n• Shell Credit x40000\n• Premium Enclosure Tank x1", duration: "Đã hết hạn" },
+            ],
+          };
+          const result = await createWuwaLivestreamMessage(sampleWuwaLive, client);
+          embed = result.embed;
+          components = result.components;
+        } else if (gameArg === "endfield" || gameArg === "ef" || gameArg === "ak") {
+          const { createEndfieldLivestreamMessage } = require("./src/features/endfieldCodes/embedBuilder");
+          const sampleEndfieldLive = {
+            version: "1.6",
+            bannerUrl: "https://web-static.hg-cdn.com/upload/image/20261012/6522503e31c3e8aa7cecc1fc9c19f2e8.jpg",
+            streamYoutube: "https://www.youtube.com/@ArknightsEndfield",
+            officialPortal: "https://endfield.gryphline.com/",
+            codes: [
+              { code: "SANCTUARYINK", rewardsText: "150 Oroberyl, 10,000 T-Credits, 5 Arms INSP Kits", duration: "Còn hiệu lực 48h" },
+              { code: "TALOSPROTOCOL", rewardsText: "150 Oroberyl, 20 Intermediate Combat Records", duration: "Còn hiệu lực 48h" },
+            ],
+          };
+          const result = await createEndfieldLivestreamMessage(sampleEndfieldLive, client);
+          embed = result.embed;
+          components = result.components;
+        } else {
+          let streamData;
+          if (gameArg === "hsr") {
+            streamData = {
+              game: "hsr",
+              version: "4.6",
+              bannerUrl: "https://upload-os-bbs.hoyolab.com/upload/community/2026/10/08/445eff9915166d9bcdbd60b279933ff8_739955734522521317.png",
               codes: [
-                { code: "FALLINGSANCTUM", rewardsText: "• Astrite x100\n• Premium Resonance Potion x2\n• Advanced Inhaler x2", duration: "Đã hết hạn" },
-                { code: "WAKINGMOON", rewardsText: "• Astrite x100\n• Advanced Sealed Tube x2\n• Premium Tuner x10", duration: "Đã hết hạn" },
-                { code: "FINDSENTINEL", rewardsText: "• Astrite x100\n• Shell Credit x40000\n• Premium Enclosure Tank x1", duration: "Đã hết hạn" },
+                { code: "3S3XKXZ5NU27", rewardsText: "100 Stellar Jade, 50,000 Credits", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=3S3XKXZ5NU27" },
+                { code: "5T3XZXZ5NU28", rewardsText: "100 Stellar Jade, 5 Traveler's Guide", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=5T3XZXZ5NU28" },
+                { code: "7B3XZXZ5NU29", rewardsText: "100 Stellar Jade, 4 Refined Aether", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=7B3XZXZ5NU29" },
               ],
             };
-            const result = await createWuwaLivestreamMessage(sampleWuwaLive);
-            embed = result.embed;
-            components = result.components;
-            gameLabel = "Wuthering Waves";
-          } else if (gameArg === "endfield" || gameArg === "ef" || gameArg === "ak") {
-            const { createEndfieldLivestreamMessage } = require("./src/features/endfieldCodes/embedBuilder");
-            const { fetchEndfieldLivestreamInfo } = require("./src/features/endfieldCodes/endfieldScraper");
-            const sampleEndfieldLive = await fetchEndfieldLivestreamInfo();
-            const result = await createEndfieldLivestreamMessage(sampleEndfieldLive);
-            embed = result.embed;
-            components = result.components;
-            gameLabel = "Arknights: Endfield";
+          } else if (gameArg === "genshin" || gameArg === "gi") {
+            streamData = {
+              game: "genshin",
+              version: "7.1",
+              bannerUrl: "https://upload-os-bbs.hoyolab.com/upload/2026/09/30/05c288b456815fbaf6aeb54f362f4f9f_3170646147861150357.png",
+              codes: [
+                { code: "GENSHINLIVE1", rewardsText: "100 Primogem, 10 Mystic Enhancement Ore", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE1" },
+                { code: "GENSHINLIVE2", rewardsText: "100 Primogem, 5 Hero's Wit", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE2" },
+                { code: "GENSHINLIVE3", rewardsText: "100 Primogem, 50,000 Mora", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE3" },
+              ],
+            };
           } else {
-            let streamData;
-            if (gameArg === "hsr") {
-              streamData = {
-                game: "hsr",
-                version: "2.6",
-                bannerUrl: "https://fastcdn.hoyoverse.com/mi18n/hsr/banners/hkrpg_pc_1920x1080.jpg",
-                codes: [
-                  { code: "3S3XKXZ5NU27", rewardsText: "100 Stellar Jade, 50,000 Credits", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=3S3XKXZ5NU27" },
-                  { code: "5T3XZXZ5NU28", rewardsText: "100 Stellar Jade, 5 Traveler's Guide", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=5T3XZXZ5NU28" },
-                  { code: "7B3XZXZ5NU29", rewardsText: "100 Stellar Jade, 4 Refined Aether", duration: "Còn hiệu lực 24h", redeemUrl: "https://hsr.hoyoverse.com/gift?code=7B3XZXZ5NU29" }
-                ]
-              };
-            } else if (gameArg === "genshin" || gameArg === "gi") {
-              streamData = {
-                game: "genshin",
-                version: "5.1",
-                bannerUrl: "https://fastcdn.hoyoverse.com/mi18n/genshin/banners/ys_pc_1920x1080.jpg",
-                codes: [
-                  { code: "GENSHINLIVE1", rewardsText: "100 Primogem, 10 Mystic Enhancement Ore", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE1" },
-                  { code: "GENSHINLIVE2", rewardsText: "100 Primogem, 5 Hero's Wit", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE2" },
-                  { code: "GENSHINLIVE3", rewardsText: "100 Primogem, 50,000 Mora", duration: "Còn hiệu lực 24h", redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINLIVE3" }
-                ]
-              };
-            } else {
-              const zzzBanner = await fetchLivestreamBanner("zzz");
-              streamData = {
-                game: "zzz",
-                version: "3.3",
-                bannerUrl: zzzBanner,
-                codes: [
-                  { code: "JRNY2SKY", rewardsText: "300 Polychrome, 30,000 Denny, 2 Senior Investigator Log, 2 W-Engine Battery", duration: "Đã hết hạn", redeemUrl: "https://zenless.hoyoverse.com/redemption?code=JRNY2SKY" }
-                ]
-              };
-            }
-
-            const hoyoRes = createLivestreamCodeMessage(streamData);
-            embed = hoyoRes.embed;
-            components = hoyoRes.components;
-            gameLabel = streamData.game.toUpperCase();
+            const zzzBanner = await fetchLivestreamBanner("zzz");
+            streamData = {
+              game: "zzz",
+              version: "3.2",
+              bannerUrl: zzzBanner,
+              codes: [
+                { code: "JRNY2SKY", rewardsText: "300 Polychrome, 30,000 Denny, 2 Senior Investigator Log, 2 W-Engine Battery", duration: "Đã hết hạn", redeemUrl: "https://zenless.hoyoverse.com/redemption?code=JRNY2SKY" },
+              ],
+            };
           }
 
-          await targetChannel.send({ embeds: [embed], components });
-          const reply = await message.reply(`✅ Đã gửi mẫu livestream **${gameLabel}** vào kênh demo <#${targetChannelId}>!`).catch(() => null);
-          if (reply) {
-            setTimeout(() => reply.delete().catch(() => {}), 4000);
-            setTimeout(() => message.delete().catch(() => {}), 4000);
-          }
+          const hoyoRes = createLivestreamCodeMessage(streamData, client);
+          embed = hoyoRes.embed;
+          components = hoyoRes.components;
         }
+
+        // Gửi thẳng vào kênh hiện tại
+        await message.channel.send({ embeds: [embed], components });
       }
       return;
     }
 
-    // 0.3 Lệnh Admin gửi tin nhắn mẫu Code Wuthering Waves xem trước giao diện (!testwuwa)
-    if (message.content.trim().toLowerCase().startsWith("!testwuwa")) {
-      const { ADMIN_IDS, ADMIN_ID, WUWA_CODES_CHANNEL_ID } = require("./src/config/env");
+    // 0.3 Lệnh Admin gửi mẫu Code Thường HoYoverse (!testhoyo, !atesthoyo [hsr|gi|zzz])
+    if (lowerRaw.startsWith("!testhoyo") || lowerRaw.startsWith("!atesthoyo")) {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const parts = message.content.trim().split(/\s+/);
+        const gameArg = (parts[1] || "genshin").toLowerCase();
+        const { createRegularCodeMessage } = require("./src/features/hoyoCodes/embedBuilder");
+
+        let sampleCode;
+        if (gameArg === "hsr") {
+          sampleCode = {
+            game: "hsr",
+            code: "STARRAILGIFT",
+            rewardsText: "50 Stellar Jade, 10,000 Credits, 2 Traveler's Guide",
+            duration: "Vô thời hạn (Còn hiệu lực)",
+            redeemUrl: "https://hsr.hoyoverse.com/gift?code=STARRAILGIFT",
+          };
+        } else if (gameArg === "zzz") {
+          sampleCode = {
+            game: "zzz",
+            code: "ZENLESSGIFT",
+            rewardsText: "50 Polychrome, 2 Official Investigator Log, 3 W-Engine Power Supply",
+            duration: "Vô thời hạn (Còn hiệu lực)",
+            redeemUrl: "https://zenless.hoyoverse.com/redemption?code=ZENLESSGIFT",
+          };
+        } else {
+          sampleCode = {
+            game: "genshin",
+            code: "GENSHINGIFT",
+            rewardsText: "50 Primogem, 3 Hero's Wit",
+            duration: "Vô thời hạn (Còn hiệu lực)",
+            redeemUrl: "https://genshin.hoyoverse.com/en/gift?code=GENSHINGIFT",
+          };
+        }
+
+        const { embed, components } = createRegularCodeMessage(sampleCode, client);
+        await message.channel.send({ embeds: [embed], components });
+      }
+      return;
+    }
+
+    // 0.4 Lệnh Admin gửi tin nhắn mẫu Code Wuthering Waves (!testwuwa, !atestwuwa)
+    if (lowerRaw.startsWith("!testwuwa") || lowerRaw.startsWith("!atestwuwa")) {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
         const { createWuwaCodeEmbed } = require("./src/features/wuwaCodes/embedBuilder");
-        const targetChannelId = WUWA_CODES_CHANNEL_ID || "1547084091868844142";
-        const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
-
-        if (targetChannel && targetChannel.isTextBased()) {
-          const sampleWuwaCode = {
-            code: "SHOREKEEPER",
-            server: "Tất cả",
-            rewardsText: "• Astrite x100\n• Shell Credit x10000\n• Premium Sealed Tube x2",
-            duration: "Còn hiệu lực",
-          };
-          const { embed, components } = await createWuwaCodeEmbed(sampleWuwaCode);
-          await targetChannel.send({ embeds: [embed], components });
-          const reply = await message.reply(`✅ Đã gửi mẫu code Wuthering Waves giao diện mới vào kênh demo <#${targetChannelId}>!`).catch(() => null);
-          if (reply) {
-            setTimeout(() => reply.delete().catch(() => {}), 4000);
-            setTimeout(() => message.delete().catch(() => {}), 4000);
-          }
-        }
+        const sampleWuwaCode = {
+          code: "SHOREKEEPER",
+          server: "Tất cả",
+          rewardsText: "• Astrite x100\n• Shell Credit x10000\n• Premium Sealed Tube x2",
+          duration: "Còn hiệu lực",
+        };
+        const { embed, components } = await createWuwaCodeEmbed(sampleWuwaCode, client);
+        await message.channel.send({ embeds: [embed], components });
       }
       return;
     }
 
-    // 0.4 Lệnh Admin gửi tin nhắn mẫu Code Arknights: Endfield xem trước giao diện (!testendfield)
-    if (message.content.trim().toLowerCase().startsWith("!testendfield")) {
-      const { ADMIN_IDS, ADMIN_ID, ENDFIELD_CODES_CHANNEL_ID } = require("./src/config/env");
+    // 0.5 Lệnh Admin gửi tin nhắn mẫu Code Arknights: Endfield (!testendfield, !atestendfield)
+    if (lowerRaw.startsWith("!testendfield") || lowerRaw.startsWith("!atestendfield")) {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
         const { createEndfieldCodeEmbed } = require("./src/features/endfieldCodes/embedBuilder");
-        const targetChannelId = ENDFIELD_CODES_CHANNEL_ID || "1547084091868844142";
-        const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
+        const sampleEndfieldCode = {
+          code: "ENDFIELDGIFT",
+          rewardsText: "• 150 Oroberyl\n• 10,000 T-Creds\n• 20 Intermediate Combat Records\n• 20 Arms INSP Kits",
+          duration: "Còn hiệu lực",
+        };
+        const { embed, components } = await createEndfieldCodeEmbed(sampleEndfieldCode, client);
+        await message.channel.send({ embeds: [embed], components });
+      }
+      return;
+    }
 
-        if (targetChannel && targetChannel.isTextBased()) {
-          const sampleEndfieldCode = {
-            code: "ENDFIELDGIFT",
-            rewardsText: "• 150 Oroberyl\n• 10,000 T-Creds\n• 20 Intermediate Combat Records\n• 20 Arms INSP Kits",
-            duration: "Còn hiệu lực",
-          };
-          const { embed, components } = await createEndfieldCodeEmbed(sampleEndfieldCode);
-          await targetChannel.send({ embeds: [embed], components });
-          const reply = await message.reply(`✅ Đã gửi mẫu code Arknights: Endfield vào kênh demo <#${targetChannelId}>!`).catch(() => null);
-          if (reply) {
-            setTimeout(() => reply.delete().catch(() => {}), 4000);
-            setTimeout(() => message.delete().catch(() => {}), 4000);
-          }
-        }
+    // 0.6 Lệnh Admin xem trước bài viết Diễn đàn Cập nhật Gacha (!testgacha, !atestgacha [hsr|gi|zzz|wuwa|ef])
+    if (lowerRaw.startsWith("!testgacha") || lowerRaw.startsWith("!atestgacha")) {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const parts = message.content.trim().split(/\s+/);
+        const gameArg = (parts[1] || "genshin").toLowerCase();
+        const { buildForumPostPayload } = require("./src/features/gachaUpdates/embedBuilder");
+        const { DEFAULT_BANNERS } = require("./src/features/gachaUpdates/scrapers");
+
+        const sampleMap = {
+          hsr: { game: "hsr", title: 'Honkai: Star Rail Version 4.6 "Dance With the Beast Before Moonrise" Update Details' },
+          zzz: { game: "zzz", title: "Zenless Zone Zero Version 3.2 Update Details" },
+          wuwa: { game: "wuwa", title: "Wuthering Waves Version 3.7 Patch Notes" },
+          ef: { game: "endfield", title: "Arknights: Endfield Core Chapter 1.6 Update Details" },
+          genshin: { game: "genshin", title: 'Genshin Impact Version 7.1 "A Rekviem for the Underworld" Update Details' },
+        };
+
+        const chosen = sampleMap[gameArg] || sampleMap.genshin;
+        const sampleSummary =
+          `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
+          `**Banner Nhân vật & Vũ khí mới:** Ra mắt nhân vật giới hạn 5 sao mới cùng vũ khí trấn đặc trưng.\n\n` +
+          `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa chuỗi nhiệm vụ chính tuyến và khu vực thám hiểm mới.\n\n` +
+          `**Sự kiện nổi bật & Quà tặng:** Tham gia chuỗi hoạt động phiên bản nhận 1000 Nguyên Thạch / Ngọc Ánh Sao và vật phẩm độc quyền.\n\n` +
+          `**Cải tiến tính năng (QoL nổi bật):** Nâng cấp giao diện quản lý trang bị và tự động thu thập tài nguyên.\n\n` +
+          `**Đền bù bảo trì:** 600 tài nguyên đền bù gửi trực tiếp qua hòm thư trong game.`;
+
+        const updateData = {
+          game: chosen.game,
+          title: chosen.title,
+          bannerUrl: DEFAULT_BANNERS[chosen.game] || DEFAULT_BANNERS.genshin,
+          postUrl: "https://hoyolab.com/",
+          btnText: "Xem bài gốc",
+          publishedAt: new Date(),
+        };
+
+        const payload = buildForumPostPayload(client, updateData, sampleSummary);
+        await message.channel.send({
+          content: `📌 **[TEST FORUM PREVIEW] Tiêu đề Thread:** \`${payload.threadName}\``,
+          embeds: payload.message.embeds,
+          components: payload.message.components,
+        });
       }
       return;
     }
