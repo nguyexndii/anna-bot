@@ -2,7 +2,7 @@
 const { scrapeAllHoyoCodes } = require("./hoyoScraper");
 const { createHoyoCodeMessage } = require("./embedBuilder");
 const HoyoCodeModel = require("../../database/models/HoyoCode");
-const { HOYO_CODES_CHANNEL_ID } = require("../../config/env");
+const { HOYO_CODES_CHANNEL_ID, HOYO_ROLE_ID } = require("../../config/env");
 
 // Set ghi nhớ các code đã biết trong RAM
 const knownHoyoCodesSet = new Set();
@@ -127,7 +127,9 @@ async function checkAndNotifyHoyoCodes(client) {
         if (channel && channel.isTextBased()) {
           try {
             const { embed, components } = createHoyoCodeMessage(codeObj);
+            const roleMention = HOYO_ROLE_ID ? `<@&${HOYO_ROLE_ID}>` : null;
             await channel.send({
+              content: roleMention || undefined,
               embeds: [embed],
               components,
             });

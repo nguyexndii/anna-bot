@@ -21,6 +21,7 @@ const PROD_CHANNELS = {
   WORDSCRAMBLE: "1535705241620717720",   // Kênh Sắp Xếp Từ chính
   WUWA_CODES: "1528768068581457930",     // Kênh Săn Code WuWa chính thức
   HOYO_CODES: "1528768068581457930",     // Kênh Săn Code HoYoverse chính thức
+  ENDFIELD_CODES: "1528768068581457930", // Kênh Săn Code Endfield chính thức
   RULES: "1450073214620405903",          // Kênh Luật chơi chính
 };
 
@@ -29,6 +30,7 @@ const TEST_CHANNELS = {
   WORDSCRAMBLE: "1547083889124573184",   // Kênh Sắp Xếp Từ test
   WUWA_CODES: "1547084091868844142",     // Kênh Săn Code WuWa test
   HOYO_CODES: "1547084091868844142",     // Kênh Săn Code HoYoverse test demo
+  ENDFIELD_CODES: "1547084091868844142", // Kênh Săn Code Endfield test demo
   RULES: "1547083697688285255",          // Kênh Luật chơi khi test
 };
 
@@ -62,6 +64,13 @@ module.exports = {
 
   // Kênh Săn Code HoYoverse (Genshin, HSR, ZZZ) - Mặc định kênh chính thức 1528768068581457930
   HOYO_CODES_CHANNEL_ID: IS_TEST_MODE ? TEST_CHANNELS.HOYO_CODES : (process.env.HOYO_CODES_CHANNEL_ID || PROD_CHANNELS.HOYO_CODES),
+  HOYO_ROLE_ID: process.env.HOYO_ROLE_ID || (ROLES && ROLES.HOYO_ROLE) || null,
+
+  // Kênh Code Arknights: Endfield (Tự động chuyển đổi giữa Test và Production)
+  ENDFIELD_CODES_CHANNEL_ID: IS_TEST_MODE ? TEST_CHANNELS.ENDFIELD_CODES : (process.env.ENDFIELD_CODES_CHANNEL_ID || PROD_CHANNELS.ENDFIELD_CODES),
+  ENDFIELD_ROLE_ID: process.env.ENDFIELD_ROLE_ID || (ROLES && ROLES.ENDFIELD_ROLE) || null,
+  ENDFIELD_LOGO_ID: (EMOJIS && EMOJIS.ENDFIELD_LOGO) || "1559559318309969970",
+  ENDFIELD_OROBERYL_ID: (EMOJIS && EMOJIS.ENDFIELD_OROBERYL) || "1559559314652528770",
 
   // 24/7 Smart Voice Room Keeper
   KEEP_VOICE_CHANNEL_ID: process.env.KEEP_VOICE_CHANNEL_ID || "1389843439851671624",

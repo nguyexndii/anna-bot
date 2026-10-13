@@ -13,6 +13,7 @@ const {
   RULES_CHANNEL_ID,
   WUWA_CODES_CHANNEL_ID,
   HOYO_CODES_CHANNEL_ID,
+  ENDFIELD_CODES_CHANNEL_ID,
   ALLOWED_GUILD_IDS,
   KEEP_VOICE_CHANNEL_ID,
   ENABLE_VOICE_KEEPER,
@@ -47,6 +48,9 @@ const { onWuwaCodeMessage } = require("./src/features/wuwaCodes/commandHandler")
 
 // HoYoverse (Genshin, HSR, ZZZ) Code Watcher
 const { initHoyoCodeWatcher } = require("./src/features/hoyoCodes");
+
+// Arknights: Endfield Code Watcher
+const { initEndfieldCodeWatcher } = require("./src/features/endfieldCodes");
 
 // Master Help Command (!lenh, !help, !command, !comment...)
 const { onHelpMessage, isMasterHelpCommand } = require("./src/features/helpCommand");
@@ -252,6 +256,14 @@ client.once(Events.ClientReady, async () => {
     console.error("❌ Lỗi khởi tạo Hoyo Code Watcher:", err.message);
   }
 
+  // Initialize Arknights: Endfield Code Watcher
+  try {
+    initEndfieldCodeWatcher(client);
+    console.log(`⚡ Săn Code Arknights: Endfield đã kích hoạt tại kênh <#${ENDFIELD_CODES_CHANNEL_ID}>`);
+  } catch (err) {
+    console.error("❌ Lỗi khởi tạo Endfield Code Watcher:", err.message);
+  }
+
   // Initialize 24/7 Smart Voice Room Keeper
   try {
     initVoiceKeeper(client);
@@ -342,6 +354,14 @@ client.on(Events.MessageCreate, async (message) => {
             embed = result.embed;
             components = result.components;
             gameLabel = "Wuthering Waves";
+          } else if (gameArg === "endfield" || gameArg === "ef" || gameArg === "ak") {
+            const { createEndfieldLivestreamMessage } = require("./src/features/endfieldCodes/embedBuilder");
+            const { fetchEndfieldLivestreamInfo } = require("./src/features/endfieldCodes/endfieldScraper");
+            const sampleEndfieldLive = await fetchEndfieldLivestreamInfo();
+            const result = await createEndfieldLivestreamMessage(sampleEndfieldLive);
+            embed = result.embed;
+            components = result.components;
+            gameLabel = "Arknights: Endfield";
           } else {
             let streamData;
             if (gameArg === "hsr") {
@@ -413,6 +433,32 @@ client.on(Events.MessageCreate, async (message) => {
           const { embed, components } = await createWuwaCodeEmbed(sampleWuwaCode);
           await targetChannel.send({ embeds: [embed], components });
           const reply = await message.reply(`✅ Đã gửi mẫu code Wuthering Waves giao diện mới vào kênh demo <#${targetChannelId}>!`).catch(() => null);
+          if (reply) {
+            setTimeout(() => reply.delete().catch(() => {}), 4000);
+            setTimeout(() => message.delete().catch(() => {}), 4000);
+          }
+        }
+      }
+      return;
+    }
+
+    // 0.4 Lệnh Admin gửi tin nhắn mẫu Code Arknights: Endfield xem trước giao diện (!testendfield)
+    if (message.content.trim().toLowerCase().startsWith("!testendfield")) {
+      const { ADMIN_IDS, ADMIN_ID, ENDFIELD_CODES_CHANNEL_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const { createEndfieldCodeEmbed } = require("./src/features/endfieldCodes/embedBuilder");
+        const targetChannelId = ENDFIELD_CODES_CHANNEL_ID || "1547084091868844142";
+        const targetChannel = await client.channels.fetch(targetChannelId).catch(() => null);
+
+        if (targetChannel && targetChannel.isTextBased()) {
+          const sampleEndfieldCode = {
+            code: "ENDFIELDGIFT",
+            rewardsText: "• 150 Oroberyl\n• 10,000 T-Creds\n• 20 Intermediate Combat Records\n• 20 Arms INSP Kits",
+            duration: "Còn hiệu lực",
+          };
+          const { embed, components } = await createEndfieldCodeEmbed(sampleEndfieldCode);
+          await targetChannel.send({ embeds: [embed], components });
+          const reply = await message.reply(`✅ Đã gửi mẫu code Arknights: Endfield vào kênh demo <#${targetChannelId}>!`).catch(() => null);
           if (reply) {
             setTimeout(() => reply.delete().catch(() => {}), 4000);
             setTimeout(() => message.delete().catch(() => {}), 4000);
