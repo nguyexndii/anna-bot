@@ -58,6 +58,17 @@ function parseExpiryDate(durationStr) {
 }
 
 /**
+ * Check if a code is permanent (vô hạn / unknown expiry)
+ * @param {string} durationStr
+ * @returns {boolean}
+ */
+function isPermanentCode(durationStr) {
+  if (!durationStr) return true;
+  const lower = durationStr.toLowerCase().trim();
+  return lower.includes("unknown") || lower.includes("permanent") || lower.includes("vô thời hạn") || lower.includes("vo thoi han");
+}
+
+/**
  * Check if a code is expired
  * @param {string} durationStr
  * @returns {boolean}
@@ -186,4 +197,5 @@ module.exports = {
   parseExpiryDate,
   isExpiringWithin24Hours,
   isCodeExpired,
+  isPermanentCode,
 };

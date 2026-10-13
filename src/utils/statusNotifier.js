@@ -69,7 +69,7 @@ async function sendAdminDM(client, adminId, { title, description, color, fields 
  * @param {Object} options 
  * @param {string} options.adminId ID tài khoản nhận DM
  * @param {string} options.botName Tên định danh của bot
- * @param {string} options.platform Nền tảng hosting (vd: Discloud)
+ * @param {string} options.platform Nền tảng hosting (vd: Render)
  */
 function initStatusNotifier(client, options = {}) {
   const {

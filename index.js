@@ -114,7 +114,7 @@ const client = new Client({
 initStatusNotifier(client, {
   adminId: ADMIN_ID || "875358286487097395",
   botName: "Anna Bot (Minigames & WuWa)",
-  platform: "Discloud Hosting",
+  platform: "Render Hosting",
 });
 
 /**

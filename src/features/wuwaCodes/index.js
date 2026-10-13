@@ -5,10 +5,7 @@ const { createWuwaCodeEmbed } = require("./embedBuilder");
 const WuwaCodeModel = require("../../database/models/WuwaCode");
 const { WUWA_CODES_CHANNEL_ID, WUWA_ROLE_ID, WEBHOOK_WUWA_CODES } = require("../../config/env");
 
-// Kênh cố định gửi code WuWa (Kênh Demo đang thử nghiệm).
-// TUYỆT ĐỐI KHÔNG GỬI VÀO KÊNH CHÍNH (1528768068581457930) CHO ĐẾN KHI NGƯỜI DÙNG YÊU CẦU!
-const WUWA_DEMO_CHANNEL_ID = "1547084091868844142";
-const BLOCKED_PRODUCTION_CHANNEL_ID = "1528768068581457930";
+const { isPermanentCode } = require("./wuwaUtils");
 
 // In-memory fallback set for known codes if MongoDB is not connected
 const knownCodesSet = new Set();
@@ -23,13 +20,6 @@ const knownCodesSet = new Set();
  * @returns {Promise<boolean>}
  */
 async function sendWuwaNotification(client, channel, embed, roleMention, components = []) {
-  // Chốt an toàn: Tuyệt đối không gửi vào kênh chính 1528768068581457930
-  if (channel && channel.id === BLOCKED_PRODUCTION_CHANNEL_ID) {
-    console.error(`⛔ [BẢO VỆ TUYỆT ĐỐI] Đã chặn gửi code WuWa vào kênh chính (${BLOCKED_PRODUCTION_CHANNEL_ID})! Chuyển hướng sang Demo (${WUWA_DEMO_CHANNEL_ID}).`);
-    const demoChannel = await client.channels.fetch(WUWA_DEMO_CHANNEL_ID).catch(() => null);
-    if (demoChannel) channel = demoChannel;
-    else return false;
-  }
 
   if (WEBHOOK_WUWA_CODES) {
     try {
@@ -106,8 +96,8 @@ async function checkAndNotifyWuwaCodes(client) {
       return;
     }
 
-    // 4. Fetch recent 50 messages in Discord notification channel (Luôn cố định kênh Demo 1547084091868844142)
-    const targetChannelId = WUWA_DEMO_CHANNEL_ID;
+    // 4. Fetch recent 50 messages in Discord notification channel (Kênh chính thức 1528768068581457930)
+    const targetChannelId = WUWA_CODES_CHANNEL_ID || "1528768068581457930";
     const channel = await client.channels.fetch(targetChannelId).catch((err) => {
       console.error(`❌ [WuWa Code Watcher] Không thể fetch channel (${targetChannelId}):`, err.message);
       return null;
@@ -167,8 +157,14 @@ async function checkAndNotifyWuwaCodes(client) {
       }
     }
 
-    // 5. Notify ONLY brand new codes (Không gửi code cũ trước ngày hôm nay)
+    // 5. Notify ONLY brand new codes (Không gửi code cũ trước ngày hôm nay, không gửi code vô hạn)
     for (const [codeStr, codeObj] of allActiveCodesMap.entries()) {
+      // Bỏ qua các code vô hạn (Permanent / Unknown) theo yêu cầu của user
+      if (codeStr === "WUTHERINGGIFT" || isPermanentCode(codeObj.duration)) {
+        knownCodesSet.add(codeStr);
+        continue;
+      }
+
       const isAlreadyInChannel = codesInChannel.has(codeStr);
       const isAlreadyKnown = knownCodesSet.has(codeStr);
       let existingDoc = null;
@@ -206,11 +202,10 @@ async function checkAndNotifyWuwaCodes(client) {
         // Send Notification via Webhook or Channel
         try {
           const { embed, components } = await createWuwaCodeEmbed(codeObj);
-          // Tuyệt đối không ping role trong kênh demo
-          const roleMention = null;
+          const roleMention = WUWA_ROLE_ID ? `<@&${WUWA_ROLE_ID}>` : null;
           await sendWuwaNotification(client, channel, embed, roleMention, components);
           codesInChannel.add(codeStr);
-          console.log(`✅ Đã gửi thông báo code mới "${codeStr}" tới kênh demo (${targetChannelId})!`);
+          console.log(`✅ Đã gửi thông báo code mới "${codeStr}" tới kênh chính thức (${targetChannelId})${roleMention ? ` kèm tag Role (${WUWA_ROLE_ID})` : ""}!`);
         } catch (sendErr) {
           console.error(`❌ Lỗi gửi tin nhắn cho code "${codeStr}":`, sendErr.message);
         }
@@ -400,7 +395,8 @@ async function deleteManualCode(identifier) {
  * @param {import("discord.js").Client} client
  */
 function initWuwaCodeWatcher(client) {
-  console.log(`🚀 [WuWa Code Watcher] Đã kích hoạt theo dõi Code tự động cố định cho kênh demo (${WUWA_DEMO_CHANNEL_ID})!`);
+  const targetChannelId = WUWA_CODES_CHANNEL_ID || "1528768068581457930";
+  console.log(`🚀 [WuWa Code Watcher] Đã kích hoạt theo dõi Code tự động cho kênh chính thức (${targetChannelId})!`);
 
   // 1. Quét mốc khởi động ban đầu (Baseline Initial Lock)
   // Toàn bộ code đang có trên web hiện tại sẽ được đánh dấu đã biết và lưu vào DB (notified: true)
