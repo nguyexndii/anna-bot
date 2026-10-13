@@ -18,6 +18,7 @@ const {
   KEEP_VOICE_CHANNEL_ID,
   ENABLE_VOICE_KEEPER,
   ADMIN_ID,
+  GACHA_UPDATE_FORUM_CHANNEL_ID,
 } = require("./src/config/env");
 
 const { initStatusNotifier } = require("./src/utils/statusNotifier");
@@ -51,6 +52,9 @@ const { initHoyoCodeWatcher } = require("./src/features/hoyoCodes");
 
 // Arknights: Endfield Code Watcher
 const { initEndfieldCodeWatcher } = require("./src/features/endfieldCodes");
+
+// Gacha Updates Forum Watcher (Tự động tóm tắt & đăng bài Forum)
+const { initGachaUpdateWatcher } = require("./src/features/gachaUpdates");
 
 // Master Help Command (!lenh, !help, !command, !comment...)
 const { onHelpMessage, isMasterHelpCommand } = require("./src/features/helpCommand");
@@ -262,6 +266,14 @@ client.once(Events.ClientReady, async () => {
     console.log(`⚡ Săn Code Arknights: Endfield đã kích hoạt tại kênh <#${ENDFIELD_CODES_CHANNEL_ID}>`);
   } catch (err) {
     console.error("❌ Lỗi khởi tạo Endfield Code Watcher:", err.message);
+  }
+
+  // Initialize Gacha Updates Forum Watcher (Tự động tóm tắt & đăng bài Forum)
+  try {
+    initGachaUpdateWatcher(client);
+    console.log(`🏛️ Kênh Forum Cập Nhật Gacha Games đã kích hoạt tại kênh <#${GACHA_UPDATE_FORUM_CHANNEL_ID}>`);
+  } catch (err) {
+    console.error("❌ Lỗi khởi tạo Gacha Update Watcher:", err.message);
   }
 
   // Initialize 24/7 Smart Voice Room Keeper

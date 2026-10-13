@@ -80,9 +80,12 @@ module.exports = {
     .map((id) => id.trim())
     .filter(Boolean),
 
-  // Gemini config (Model: gemini-3.1-flash-lite)
+  // Kênh Forum Cập Nhật Gacha Games (Đa Game)
+  GACHA_UPDATE_FORUM_CHANNEL_ID: process.env.GACHA_UPDATE_FORUM_CHANNEL_ID || "1559612707605319710",
+
+  // Gemini config (Model: gemini-3.8-flash với fallback 3.5-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(",").map((k) => k.trim()).filter(Boolean),
-  GEMINI_MODEL_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=",
+  GEMINI_MODEL_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=",
 
   // Webhooks
   WEBHOOK_WORDCHAIN: process.env.WEBHOOK_WORDCHAIN,
