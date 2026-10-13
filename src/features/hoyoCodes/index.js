@@ -42,11 +42,25 @@ async function checkAndNotifyHoyoCodes(client) {
         const recentMessages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
         if (recentMessages && recentMessages.size > 0) {
           recentMessages.forEach((msg) => {
+            // Quét qua embeds
             if (msg.embeds && msg.embeds.length > 0) {
               for (const emb of msg.embeds) {
                 if (emb.description) {
-                  const match = emb.description.match(/`([A-Za-z0-9_-]{4,40})`/);
-                  if (match) codesInChannel.add(match[1].toUpperCase());
+                  const match = emb.description.match(/(`|\*\*)([A-Za-z0-9_-]{4,40})(`|\*\*)/);
+                  if (match) codesInChannel.add(match[2].toUpperCase());
+                }
+              }
+            }
+            // Quét qua các button link để bắt trọn vẹn 100% mã code
+            if (msg.components && msg.components.length > 0) {
+              for (const row of msg.components) {
+                if (row.components) {
+                  for (const comp of row.components) {
+                    if (comp.url) {
+                      const urlMatch = comp.url.match(/code=([A-Za-z0-9_-]+)/i);
+                      if (urlMatch) codesInChannel.add(urlMatch[1].toUpperCase());
+                    }
+                  }
                 }
               }
             }
@@ -79,7 +93,7 @@ async function checkAndNotifyHoyoCodes(client) {
             {
               game: codeObj.game,
               code: codeObj.code,
-              server: codeObj.server || "All",
+              server: codeObj.server || "Tất cả",
               rewardsText: codeObj.rewardsText || "• Chưa có thông tin phần thưởng",
               duration: codeObj.duration || "Còn hiệu lực",
               redeemUrl: codeObj.redeemUrl || "",

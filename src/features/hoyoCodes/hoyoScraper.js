@@ -2,6 +2,8 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 
+const { EMOJIS } = require("../../config/ids");
+
 const GAME_CONFIG = {
   genshin: {
     name: "Genshin Impact",
@@ -9,10 +11,11 @@ const GAME_CONFIG = {
     apiUrl: "https://hoyo-codes.seria.moe/codes?game=genshin",
     redeemBaseUrl: "https://genshin.hoyoverse.com/en/gift?code=",
     color: "#E6A23C",
-    icon: "https://webstatic.hoyoverse.com/upload/op-public/2023/11/08/94c8b74618774776108b3c9bfce92080_4467319951670984918.png",
+    icon: `https://cdn.discordapp.com/emojis/${EMOJIS.GENSHIN_LOGO || "1559502726985949184"}.png`,
     banner: "https://fastcdn.hoyoverse.com/mi18n/genshin/banners/ys_pc_1920x1080.jpg",
     streamEn: "https://www.youtube.com/@GenshinImpact",
     streamJp: "https://www.youtube.com/@Genshin_JP",
+    hoyolabUid: "1015537",
   },
   hsr: {
     name: "Honkai: Star Rail",
@@ -20,10 +23,11 @@ const GAME_CONFIG = {
     apiUrl: "https://hoyo-codes.seria.moe/codes?game=hkrpg",
     redeemBaseUrl: "https://hsr.hoyoverse.com/gift?code=",
     color: "#9C27B0",
-    icon: "https://webstatic.hoyoverse.com/upload/op-public/2023/04/26/5d1668894452589e47f78c8577e77bca_739343717144171694.png",
+    icon: `https://cdn.discordapp.com/emojis/${EMOJIS.HSR_LOGO || "1559502723148415096"}.png`,
     banner: "https://fastcdn.hoyoverse.com/mi18n/hsr/banners/hkrpg_pc_1920x1080.jpg",
     streamEn: "https://www.youtube.com/@HonkaiStarRail",
     streamJp: "https://www.youtube.com/@Houkaistarrail_JP",
+    hoyolabUid: "172534910",
   },
   zzz: {
     name: "Zenless Zone Zero",
@@ -31,12 +35,80 @@ const GAME_CONFIG = {
     apiUrl: "https://hoyo-codes.seria.moe/codes?game=nap",
     redeemBaseUrl: "https://zenless.hoyoverse.com/redemption?code=",
     color: "#FF9800",
-    icon: "https://fastcdn.hoyoverse.com/static-resource-v2/2024/07/04/436573c9bf1f39f1c79e7240c5e7b235_5348873722765355601.png",
+    icon: `https://cdn.discordapp.com/emojis/${EMOJIS.ZZZ_LOGO || "1559502720879173633"}.png`,
     banner: "https://fastcdn.hoyoverse.com/static-resource-v2/2024/07/04/b530c33fb355dbfc65ee3d1bfef0bc94_1064619992036495240.png",
     streamEn: "https://www.youtube.com/@ZenlessZoneZero",
     streamJp: "https://www.youtube.com/@ZZZ_JP",
+    hoyolabUid: "219270333",
   },
 };
+
+// Cache banner livestream để tối ưu tốc độ và tránh spam API
+const bannerCache = new Map();
+
+/**
+ * Lấy ảnh banner Special Program / Livestream chính thức từ HoYoLAB
+ * @param {string} gameKey
+ * @returns {Promise<string|null>}
+ */
+async function fetchLivestreamBanner(gameKey) {
+  const cached = bannerCache.get(gameKey);
+  if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
+    return cached.banner;
+  }
+
+  const config = GAME_CONFIG[gameKey];
+  if (!config || !config.hoyolabUid) return null;
+
+  try {
+    const url = `https://bbs-api-os.hoyolab.com/community/post/wapi/userPost?uid=${config.hoyolabUid}`;
+    const res = await axios.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "x-rpc-client_type": "4",
+      },
+      timeout: 8000,
+    });
+
+    const posts = res.data?.data?.list || [];
+    for (const item of posts.slice(0, 10)) {
+      const subject = item.post?.subject?.toLowerCase() || "";
+      if (
+        subject.includes("special program") ||
+        subject.includes("livestream") ||
+        subject.includes("intel report") ||
+        (subject.includes("version") && (subject.includes("program") || subject.includes("overview") || subject.includes("preview")))
+      ) {
+        const cover = item.post?.cover_list?.[0]?.url || item.post?.images?.[0];
+        if (cover) {
+          bannerCache.set(gameKey, { banner: cover, timestamp: Date.now() });
+          return cover;
+        }
+
+        if (item.post?.post_id) {
+          const detailUrl = `https://bbs-api-os.hoyolab.com/community/post/wapi/getPostFull?post_id=${item.post.post_id}`;
+          const detailRes = await axios.get(detailUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+              "x-rpc-client_type": "4",
+            },
+            timeout: 8000,
+          });
+          const p = detailRes.data?.data?.post;
+          const detailCover = p?.cover_list?.[0]?.url || p?.image_list?.[0]?.url;
+          if (detailCover) {
+            bannerCache.set(gameKey, { banner: detailCover, timestamp: Date.now() });
+            return detailCover;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️ [Hoyo Scraper] Không thể lấy banner livestream ${gameKey}:`, err.message);
+  }
+
+  return null;
+}
 
 /**
  * Cào mã code từ API hoyo-codes đã được validate
@@ -55,7 +127,7 @@ async function fetchCodesFromApi(gameKey) {
       .map((c) => ({
         game: gameKey,
         code: c.code.trim().toUpperCase(),
-        server: "All",
+        server: "Tất cả",
         rewardsText: c.rewards ? `• ${c.rewards.replace(/;/g, "\n• ")}` : "• Quà tặng vật phẩm game",
         duration: "Còn hiệu lực",
         redeemUrl: `${config.redeemBaseUrl}${c.code.trim().toUpperCase()}`,
@@ -94,16 +166,18 @@ async function scrapeGenshinCodes() {
       if (!code) return;
 
       const tds = $(tr).find("td");
-      let server = "All";
+      let server = "Tất cả";
       let rewards = "Primogem & Vật phẩm game";
       let duration = "Còn hiệu lực";
 
       if (tds.length >= 4) {
-        server = $(tds[1]).text().trim() || "All";
+        const rawServer = $(tds[1]).text().trim();
+        server = (!rawServer || rawServer.toLowerCase() === "all") ? "Tất cả" : rawServer;
         rewards = $(tds[2]).text().trim().replace(/\s+/g, " ");
         duration = $(tds[3]).text().trim().replace(/\s+/g, " ");
       } else if (tds.length >= 3) {
-        server = $(tds[1]).text().trim() || "All";
+        const rawServer = $(tds[1]).text().trim();
+        server = (!rawServer || rawServer.toLowerCase() === "all") ? "Tất cả" : rawServer;
         rewards = $(tds[2]).text().trim().replace(/\s+/g, " ");
       }
 
@@ -154,7 +228,8 @@ async function scrapeHsrCodes() {
       // Bỏ qua các code đã hết hạn
       if (durationText.toLowerCase().includes("expired:")) return;
 
-      const server = $(tds[1]).text().trim() || "All";
+      const rawServer = $(tds[1]).text().trim();
+      const server = (!rawServer || rawServer.toLowerCase() === "all") ? "Tất cả" : rawServer;
       const rewards = $(tds[2]).text().trim().replace(/\s+/g, " ") || "Stellar Jade & Vật phẩm game";
 
       codes.push({
@@ -198,7 +273,8 @@ async function scrapeZzzCodes() {
       if (!code) return;
 
       const tds = $(tr).find("td");
-      const server = $(tds[1]).text().trim() || "All";
+      const rawServer = $(tds[1]).text().trim();
+      const server = (!rawServer || rawServer.toLowerCase() === "all") ? "Tất cả" : rawServer;
       const rewards = $(tds[2]).text().trim().replace(/\s+/g, " ") || "Polychrome & Vật phẩm game";
 
       codes.push({
@@ -266,6 +342,7 @@ async function scrapeAllHoyoCodes() {
 
 module.exports = {
   GAME_CONFIG,
+  fetchLivestreamBanner,
   scrapeGenshinCodes,
   scrapeHsrCodes,
   scrapeZzzCodes,
