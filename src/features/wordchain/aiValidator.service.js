@@ -19,6 +19,9 @@ function getNextApiKey() {
   return key;
 }
 
+// Cache thẩm định từ trong bộ nhớ RAM để tiết kiệm tối đa hạn ngạch Gemini API (tối đa 2.000 cụm từ)
+const verificationCache = new Map();
+
 /**
  * Call Gemini API with Multi-Model Fallback & Multi-Key Rotation
  * Thử gemini-3.5-flash-lite trước, nếu lỗi tự động chuyển sang gemini-3.1-flash-lite
@@ -49,21 +52,32 @@ async function callGeminiApi(prompt, temperature = 0.1) {
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 giây timeout
+
       try {
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: controller.signal,
         });
 
         if (response.ok) {
           const data = await response.json();
+          clearTimeout(timeoutId);
           return data;
         }
 
         console.warn(`⚠️ Model ${modelName} với Key [${apiKey.slice(0, 8)}...] trả về HTTP ${response.status}. Thử tiếp...`);
       } catch (err) {
-        console.error(`❌ Lỗi gọi ${modelName} với Key [${apiKey.slice(0, 8)}...]:`, err.message);
+        if (err.name === "AbortError") {
+          console.warn(`⏱️ Gemini API (${modelName}) Timeout sau 8s.`);
+        } else {
+          console.error(`❌ Lỗi gọi ${modelName} với Key [${apiKey.slice(0, 8)}...]:`, err.message);
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
   }
@@ -78,9 +92,28 @@ async function callGeminiApi(prompt, temperature = 0.1) {
  * @returns {Promise<{valid: boolean, explanation: string}>}
  */
 async function verifyWordWithAI(firstWord, secondWord) {
-  const phrase = `${firstWord.trim()} ${secondWord.trim()}`;
+  const w1 = (firstWord || "").trim();
+  const w2 = (secondWord || "").trim();
+
+  // 1. Kiểm tra validation độ dài & ký tự đặc biệt (Chống Spam / Prompt Injection)
+  if (!w1 || !w2 || w1.length > 15 || w2.length > 15) {
+    return { valid: false, explanation: "Từ quá dài hoặc không hợp lệ" };
+  }
+
+  // Chặn nếu chứa ký tự đặc biệt nguy hiểm hoặc format điều khiển
+  if (/[{}<>"\\\/$;`~^+=*]/.test(w1) || /[{}<>"\\\/$;`~^+=*]/.test(w2)) {
+    return { valid: false, explanation: "Chứa ký tự không hợp lệ" };
+  }
+
+  const phrase = `${w1.toLowerCase()} ${w2.toLowerCase()}`;
+
+  // 2. Tra cứu Cache trong RAM (tiết kiệm 100% token nếu từ đã từng được kiểm tra)
+  if (verificationCache.has(phrase)) {
+    return verificationCache.get(phrase);
+  }
+
   const prompt = `Bạn là Trọng tài Ngôn ngữ Tiếng Việt nghiêm túc và chuẩn mực cho trò chơi Nối Từ.
-Nhiệm vụ: Thẩm định xem cụm 2 từ "${phrase}" (nối từ "${firstWord}" sang "${secondWord}") có phải là một từ hoặc cụm từ tiếng Việt 2 tiếng thực sự có nghĩa rõ ràng, nghiêm túc và được công nhận trong từ điển hoặc đời sống văn minh hay không.
+Nhiệm vụ: Thẩm định xem cụm 2 từ "${phrase}" (nối từ "${w1}" sang "${w2}") có phải là một từ hoặc cụm từ tiếng Việt 2 tiếng thực sự có nghĩa rõ ràng, nghiêm túc và được công nhận trong từ điển hoặc đời sống văn minh hay không.
 
 QUY TẮC NGHIÊM NGẠC:
 1. TUYỆT ĐỐI KHÔNG duyệt các từ cợt nhả, thô tục, chửi thề, từ nhảm nhí hoặc teencode cố tình ghép chữ vô nghĩa.
@@ -99,10 +132,20 @@ Bắt buộc trả về đúng định dạng JSON:
       const resultText = data.candidates[0].content.parts[0].text;
       const parsed = JSON.parse(resultText);
       console.log(`✨ Trọng tài Thẩm định "${phrase}": valid=${parsed.valid} (${parsed.explanation})`);
-      return {
+
+      const result = {
         valid: Boolean(parsed.valid),
         explanation: parsed.explanation || "",
       };
+
+      // Lưu vào Cache (giới hạn tối đa 2000 cụm từ)
+      if (verificationCache.size > 2000) {
+        const oldestKey = verificationCache.keys().next().value;
+        verificationCache.delete(oldestKey);
+      }
+      verificationCache.set(phrase, result);
+
+      return result;
     } catch (e) {
       console.error("❌ Lỗi parse JSON từ Gemini:", e.message);
     }

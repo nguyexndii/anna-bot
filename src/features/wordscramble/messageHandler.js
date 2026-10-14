@@ -12,7 +12,7 @@ const {
   createScrambleHelpEmbed,
 } = require("./embedBuilder");
 const { applySmartMoveReaction } = require("../../utils/emojiManager");
-const { checkVulgarAndMute } = require("../../utils/moderation");
+const { checkVulgarAndMute } = require("../../utils/moderationHelper");
 const { sendWebhook } = require("../../utils/webhook.service");
 const { WORDSCRAMBLE_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
 

@@ -22,7 +22,7 @@ const {
 } = require("./embedBuilder");
 const { sendWebhook } = require("../../utils/webhook.service");
 const { applySmartMoveReaction } = require("../../utils/emojiManager");
-const { checkVulgarAndMute } = require("../../utils/moderation");
+const { checkVulgarAndMute } = require("../../utils/moderationHelper");
 const { WORDCHAIN_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
 
 const isAdmin = (userId) => (ADMIN_IDS && ADMIN_IDS.length > 0) ? ADMIN_IDS.includes(userId) : userId === ADMIN_ID;

@@ -1,4 +1,4 @@
-// src/utils/moderation.js
+// src/utils/moderationHelper.js
 // Bộ kiểm duyệt tự động CHỈ MUTE khi phát ngôn từ ngữ RẤT BẬY BẠ / TỤC TĨU NẶNG
 // Tuyệt đối không Mute bừa các từ thông thường.
 

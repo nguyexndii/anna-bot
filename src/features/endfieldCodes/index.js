@@ -2,6 +2,7 @@
 const { createEndfieldCodeEmbed, createEndfieldLivestreamMessage } = require("./embedBuilder");
 const { scrapeEndfieldCodes, fetchEndfieldLivestreamInfo } = require("./endfieldScraper");
 const { ENDFIELD_CODES_CHANNEL_ID, ENDFIELD_ROLE_ID } = require("../../config/env");
+const EndfieldCodeModel = require("../../database/models/EndfieldCode");
 
 const knownEndfieldCodes = new Set();
 const knownEndfieldLiveSet = new Set();
@@ -20,13 +21,35 @@ async function checkAndNotifyEndfieldCodes(client) {
     const codes = await scrapeEndfieldCodes();
     for (const codeObj of codes) {
       const codeKey = codeObj.code.toUpperCase();
-      if (!knownEndfieldCodes.has(codeKey)) {
+      const existingDoc = await EndfieldCodeModel.findOne({ code: codeKey }).catch(() => null);
+
+      if (!knownEndfieldCodes.has(codeKey) && (!existingDoc || !existingDoc.notified)) {
         console.log(`🎉 [Endfield Codes] PHÁT HIỆN CODE MỚI: ${codeKey}!`);
         knownEndfieldCodes.add(codeKey);
-        const { embed, components } = await createEndfieldCodeEmbed(codeObj);
+
+        // Lưu vào MongoDB Atlas
+        try {
+          await EndfieldCodeModel.findOneAndUpdate(
+            { code: codeKey },
+            {
+              code: codeKey,
+              rewardsText: codeObj.rewardsText || "• Chưa có thông tin phần thưởng",
+              duration: codeObj.duration || "Còn hiệu lực",
+              isActive: true,
+              notified: true,
+            },
+            { upsert: true, returnDocument: "after" }
+          );
+        } catch (dbErr) {
+          console.error(`⚠️ Không thể lưu code Endfield "${codeKey}" vào MongoDB:`, dbErr.message);
+        }
+
+        const { embed, components } = await createEndfieldCodeEmbed(codeObj, client);
         const roleMention = ENDFIELD_ROLE_ID ? `<@&${ENDFIELD_ROLE_ID}>` : null;
         await channel.send({ content: roleMention || undefined, embeds: [embed], components });
         console.log(`✅ [Endfield Codes] Đã gửi code mới (${codeKey}) kèm tag role tới kênh (${targetChannelId}).`);
+      } else {
+        knownEndfieldCodes.add(codeKey);
       }
     }
   } catch (err) {
@@ -62,16 +85,37 @@ async function checkAndNotifyEndfieldLivestream(client) {
  * Quy tắc: Khóa mốc toàn bộ code cũ và stream cũ ban đầu, chỉ thông báo từ hôm nay trở đi
  * @param {import("discord.js").Client} client
  */
-function initEndfieldCodeWatcher(client) {
-  // 1. Khóa mốc toàn bộ code cũ hiện có (chỉ gửi code mới từ hôm nay trở đi)
+async function initEndfieldCodeWatcher(client) {
+  // 1. Tải danh sách code đã lưu trong MongoDB vào bộ nhớ
+  try {
+    const savedCodes = await EndfieldCodeModel.find({});
+    if (savedCodes && savedCodes.length > 0) {
+      savedCodes.forEach((c) => knownEndfieldCodes.add(c.code.toUpperCase()));
+      console.log(`📦 [Endfield Codes] Đã nạp ${savedCodes.length} mã code từ MongoDB Atlas.`);
+    }
+  } catch (dbErr) {
+    console.warn("⚠️ [Endfield Codes] Lỗi nạp code từ MongoDB:", dbErr.message);
+  }
+
+  // 2. Khóa mốc toàn bộ code cũ hiện có trên web (nếu chưa có trong DB thì lưu với notified: true để không gửi lại)
   scrapeEndfieldCodes()
-    .then((codes) => {
-      codes.forEach((c) => knownEndfieldCodes.add(c.code.toUpperCase()));
+    .then(async (codes) => {
+      for (const c of codes) {
+        const key = c.code.toUpperCase();
+        knownEndfieldCodes.add(key);
+        try {
+          await EndfieldCodeModel.updateOne(
+            { code: key },
+            { $setOnInsert: { code: key, rewardsText: c.rewardsText, duration: c.duration, notified: true } },
+            { upsert: true }
+          );
+        } catch (_) {}
+      }
       console.log(`🔒 [Endfield Codes] Đã khóa mốc ${knownEndfieldCodes.size} code cũ ban đầu (không gửi code cũ).`);
     })
     .catch((err) => console.warn("⚠️ [Endfield Codes] Lỗi khóa mốc code ban đầu:", err.message));
 
-  // 2. Khóa mốc thông báo livestream cũ hiện có
+  // 3. Khóa mốc thông báo livestream cũ hiện có
   fetchEndfieldLivestreamInfo()
     .then((info) => {
       if (info?.version) {
