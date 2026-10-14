@@ -164,44 +164,57 @@ async function fetchHoyoverseUpdates(gameKey, gId) {
  * Cào tin Wuthering Waves từ Kuro Games Web/Launcher
  */
 async function fetchWuwaUpdates() {
+  const endpoint = "https://prod-alicdn-gamestarter.kurogame.com/launcher/50004_obOHXFrFanqsaIEOmuKroCcbZkQRBC7c/G153/information/en.json";
   try {
-    // Kuro Games News API / Launcher News
-    const res = await axios.get(
-      "https://hw-pcdownload-qcloud.aki-game.net/launcher/news/news_en.json",
-      { timeout: 8000 }
-    );
-    const newsList = res.data?.data?.news || res.data?.news || [];
-    const updates = [];
+    const res = await axios.get(endpoint, {
+      timeout: 8000,
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
 
-    for (const item of newsList) {
-      const publishedAt = item.date ? new Date(item.date) : null;
+    const guidance = res.data?.guidance || {};
+    const notices = guidance.notice?.contents || [];
+    const news = guidance.news?.contents || [];
+    const allItems = [...notices, ...news];
+    const updates = [];
+    const currentYear = new Date().getFullYear();
+
+    for (const item of allItems) {
+      const title = item.content || "";
+      if (!title) continue;
+
+      let publishedAt = null;
+      if (item.time) {
+        // Định dạng MM-DD -> YYYY-MM-DD
+        publishedAt = new Date(`${currentYear}-${item.time}`);
+      }
+
       // Chỉ nhận bài xuất bản từ hôm nay
-      if (!publishedAt || !isPublishedToday(publishedAt)) {
+      if (publishedAt && !isPublishedToday(publishedAt)) {
         continue;
       }
 
-      const title = item.title || "";
       if (isUpdatePost(title)) {
-        const articleId = String(item.id || item.articleId || title);
-        const postUrl = item.link || item.url || `https://wutheringwaves.kurogames.com/en/main/news/detail/${articleId}`;
-        const bannerUrl = item.img || item.cover || item.banner || DEFAULT_BANNERS.wuwa;
+        const postUrl = item.jumpUrl || "https://wutheringwaves.kurogames.com/en/";
+        const bannerUrl = DEFAULT_BANNERS.wuwa;
+        const articleId = Buffer.from(title).toString("base64").slice(0, 20);
 
         updates.push({
           game: "wuwa",
           articleId: `wuwa_${articleId}`,
           title,
-          content: item.desc || item.content || title,
+          content: title,
           bannerUrl,
           postUrl,
           btnText: "Xem bài gốc Kuro Games",
-          publishedAt,
+          publishedAt: publishedAt || new Date(),
         });
       }
     }
+
     recordSuccess("gacha_wuwa");
     return updates;
   } catch (err) {
-    recordError("gacha_wuwa", err.message);
+    recordError("gacha_wuwa", `Lỗi cào Kuro Games: ${err.message}`);
     console.warn("[GachaUpdates] Lỗi fetch WuWa:", err.message);
     return [];
   }
