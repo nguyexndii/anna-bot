@@ -23,8 +23,8 @@ async function checkAndPublishGachaUpdates(client) {
   isChecking = true;
   try {
     const channel = await client.channels.fetch(GACHA_UPDATE_FORUM_CHANNEL_ID).catch(() => null);
-    if (!channel || !channel.isThreadOnly()) {
-      console.warn(`[GachaUpdates] Không tìm thấy kênh Diễn đàn với ID: ${GACHA_UPDATE_FORUM_CHANNEL_ID}`);
+    if (!channel || (!channel.isThreadOnly() && !channel.isTextBased())) {
+      console.warn(`[GachaUpdates] Không tìm thấy kênh tin tức với ID: ${GACHA_UPDATE_FORUM_CHANNEL_ID}`);
       return;
     }
 
@@ -49,15 +49,37 @@ async function checkAndPublishGachaUpdates(client) {
         // Gọi AI tóm tắt chuyên sâu 1200 - 1800 ký tự
         const summaryText = await summarizeGameUpdate(update.game, update.title, update.content);
 
-        // Xây dựng payload đăng Forum (kèm emoji riêng, banner, tag và silent post)
+        // Xây dựng payload đăng tin
         const payload = buildForumPostPayload(client, update, summaryText);
 
-        // Tạo bài đăng mới trong kênh Forum
-        const thread = await channel.threads.create({
-          name: payload.threadName,
-          appliedTags: payload.appliedTags,
-          message: payload.message,
-        });
+        let threadId = null;
+
+        if (channel.isThreadOnly()) {
+          // 1. Chế độ Diễn Đàn (Forum Channel): Tạo bài viết Thread
+          const thread = await channel.threads.create({
+            name: payload.threadName,
+            appliedTags: payload.appliedTags,
+            message: payload.message,
+          });
+          threadId = thread.id;
+          console.log(`[GachaUpdates] ✅ Đã đăng bài thành công lên Forum: [${thread.name}] (Thread ID: ${thread.id})`);
+        } else {
+          // 2. Chế độ Kênh Chat Thường / Kênh Thông Báo: Gửi trực tiếp bản tin vào kênh
+          const sentMsg = await channel.send(payload.message);
+          threadId = sentMsg.id;
+
+          // Mở luồng thảo luận con dưới tin nhắn nếu kênh hỗ trợ
+          try {
+            const threadName = `Thảo luận: ${payload.threadName}`.slice(0, 95);
+            await sentMsg.startThread({
+              name: threadName,
+              autoArchiveDuration: 1440, // 24 giờ
+            });
+          } catch (threadErr) {
+            // Không có quyền tạo thread hoặc kênh tắt tính năng thread -> bỏ qua
+          }
+          console.log(`[GachaUpdates] ✅ Đã đăng bản tin trực tiếp vào kênh chat: [${payload.threadName}] (Message ID: ${sentMsg.id})`);
+        }
 
         // Lưu vào MongoDB để không bao giờ đăng trùng lại
         await GachaForumPost.create({
@@ -66,11 +88,9 @@ async function checkAndPublishGachaUpdates(client) {
           title: update.title,
           postUrl: update.postUrl,
           bannerUrl: update.bannerUrl,
-          threadId: thread.id,
+          threadId: threadId,
           publishedAt: update.publishedAt,
         });
-
-        console.log(`[GachaUpdates] ✅ Đã đăng bài thành công lên Forum: [${thread.name}] (Thread ID: ${thread.id})`);
 
         // Nghỉ 2.5 giây giữa các bài đăng để đảm bảo an toàn với rate limit của Discord
         await new Promise((r) => setTimeout(r, 2500));

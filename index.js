@@ -547,14 +547,40 @@ client.on(Events.MessageCreate, async (message) => {
           genshin: { game: "genshin", title: 'Genshin Impact Version 7.1 "A Rekviem for the Underworld" Update Details' },
         };
 
-        const chosen = sampleMap[gameArg] || sampleMap.genshin;
-        const sampleSummary =
-          `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
-          `**Banner Nhân vật & Vũ khí mới:** Ra mắt nhân vật giới hạn 5 sao mới cùng vũ khí trấn đặc trưng.\n\n` +
-          `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa chuỗi nhiệm vụ chính tuyến và khu vực thám hiểm mới.\n\n` +
-          `**Sự kiện nổi bật & Quà tặng:** Tham gia chuỗi hoạt động phiên bản nhận 1000 Nguyên Thạch / Ngọc Ánh Sao và vật phẩm độc quyền.\n\n` +
-          `**Cải tiến tính năng (QoL nổi bật):** Nâng cấp giao diện quản lý trang bị và tự động thu thập tài nguyên.\n\n` +
-          `**Đền bù bảo trì:** 600 tài nguyên đền bù gửi trực tiếp qua hòm thư trong game.`;
+        const sampleSummaries = {
+          hsr: `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
+            `**Banner Nhân vật & Vũ khí mới:** Ra mắt nhân vật giới hạn 5 sao mới cùng Nón Ánh Sáng trấn đặc trưng.\n\n` +
+            `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa chuỗi Khai Phá mới và bản đồ thám hiểm thế giới mới.\n\n` +
+            `**Sự kiện nổi bật & Quà tặng:** Tham gia chuỗi hoạt động phiên bản nhận 1000 Ngọc Ánh Sao và Vé Tinh Cầu Đặc Biệt.\n\n` +
+            `**Cải tiến tính năng (QoL nổi bật):** Tối ưu hóa hệ thống Di Vật và tăng tốc độ farm nguyên liệu.\n\n` +
+            `**Đền bù bảo trì:** 600 Ngọc Ánh Sao đền bù gửi trực tiếp qua hòm thư trong game.`,
+          genshin: `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
+            `**Banner Nhân vật & Vũ khí mới:** Ra mắt nhân vật 5 sao mới cùng vũ khí đặc trưng.\n\n` +
+            `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa nhiệm vụ Ma Thần và khu vực thám hiểm mới.\n\n` +
+            `**Sự kiện nổi bật & Quà tặng:** Tham gia sự kiện nhận 1000 Nguyên Thạch và Mối Duyên Vương Vấn.\n\n` +
+            `**Cải tiến tính năng (QoL nổi bật):** Nâng cấp giao diện bản đồ và túi đồ.\n\n` +
+            `**Đền bù bảo trì:** 600 Nguyên Thạch gửi qua hòm thư.`,
+          zzz: `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
+            `**Banner Nhân vật & Vũ khí mới:** Ra mắt Agent hạng S mới cùng W-Engine đặc trưng.\n\n` +
+            `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa chương truyện đặc biệt và khu vực New Eridu mới.\n\n` +
+            `**Sự kiện nổi bật & Quà tặng:** Tham gia sự kiện nhận 1000 Phim Màu và Băng Ghi Hình Mã Hóa.\n\n` +
+            `**Cải tiến tính năng (QoL nổi bật):** Tối ưu hệ thống Ủy thác và Khiêu chiến Lỗ Hổng.\n\n` +
+            `**Đền bù bảo trì:** 600 Phim Màu gửi qua hòm thư.`,
+          wuwa: `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
+            `**Banner Nhân vật & Vũ khí mới:** Ra mắt Resonator 5 sao mới cùng vũ khí trấn đặc trưng.\n\n` +
+            `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa cốt truyện Huanglong mới và vùng đất thám hiểm bí ẩn.\n\n` +
+            `**Sự kiện nổi bật & Quà tặng:** Tham gia sự kiện nhận 1000 Astrite và Thủy Triều Rạng Rỡ.\n\n` +
+            `**Cải tiến tính năng (QoL nổi bật):** Tối ưu hệ thống Echo và tự động khóa trang bị.\n\n` +
+            `**Đền bù bảo trì:** 600 Astrite gửi qua hòm thư.`,
+          endfield: `**Phiên bản & Thời gian:** Khai mở sau đợt bảo trì hoàn tất từ 06:00 đến 11:00 (UTC+8).\n\n` +
+            `**Banner Nhân vật & Vũ khí mới:** Tuyển dụng Operator đặc nhiệm mới cùng trang bị chuyên dụng.\n\n` +
+            `**Cốt truyện & Bản đồ/Khu vực mới:** Mở khóa chương hành động mới trên bề mặt Talos-II.\n\n` +
+            `**Sự kiện nổi bật & Quà tặng:** Hoàn thành nhiệm vụ nhận 1000 Oroberyl và tài nguyên tiếp tế.\n\n` +
+            `**Cải tiến tính năng (QoL nổi bật):** Nâng cấp dây chuyền sản xuất tự động AIC.\n\n` +
+            `**Đền bù bảo trì:** 600 Oroberyl gửi qua hòm thư.`,
+        };
+
+        const sampleSummary = sampleSummaries[chosen.game] || sampleSummaries.genshin;
 
         const updateData = {
           game: chosen.game,
