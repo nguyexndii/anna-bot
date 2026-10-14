@@ -291,6 +291,14 @@ client.once(Events.ClientReady, async () => {
   } catch (err) {
     console.error("❌ Lỗi khởi tạo Health Tracker:", err.message);
   }
+
+  // Pre-load All Application Emojis into Memory Cache
+  try {
+    const { loadApplicationEmojis } = require("./src/utils/emojiHelper");
+    await loadApplicationEmojis(client);
+  } catch (emojiErr) {
+    console.warn("⚠️ Không thể tải trước Application Emojis:", emojiErr.message);
+  }
 });
 
 // Auto-leave if added to an unauthorized guild
@@ -341,9 +349,18 @@ client.on(Events.MessageCreate, async (message) => {
     if (lowerRaw === "!checkhoyo" || lowerRaw === "!acheckhoyo") {
       const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
-        await message.channel.send("🔄 **[Hoyo Watcher]** Đang quét mã code HoYoverse (Genshin, HSR, ZZZ) ngay lập tức...");
+        const statusMsg = await message.channel.send("🔄 **[Hoyo Watcher]** Đang tiến hành quét kiểm tra code HoYoverse (Genshin, HSR, ZZZ)...");
         const { checkAndNotifyHoyoCodes } = require("./src/features/hoyoCodes");
-        await checkAndNotifyHoyoCodes(client);
+        try {
+          const result = await checkAndNotifyHoyoCodes(client);
+          if (result && result.success) {
+            await statusMsg.edit(`✅ **[Hoyo Watcher]** Đã kiểm tra xong!\n${result.message}`);
+          } else {
+            await statusMsg.edit(`⚠️ **[Hoyo Watcher]** Quá trình quét gặp sự cố: ${result?.message || "Không xác định"}`);
+          }
+        } catch (err) {
+          await statusMsg.edit(`❌ **[Hoyo Watcher]** Lỗi hệ thống: ${err.message}`);
+        }
       }
       return;
     }

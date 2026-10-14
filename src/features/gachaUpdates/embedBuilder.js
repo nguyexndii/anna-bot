@@ -51,19 +51,7 @@ const GAME_FORUM_CONFIG = {
   },
 };
 
-/**
- * Tìm emoji trong Application hoặc Server theo tên, nếu không có thì dùng fallback
- */
-function getEmoji(client, emojiName, fallbackEmoji) {
-  if (!client) return fallbackEmoji;
-  // Tìm trong bot application emojis hoặc guild emojis
-  const found = client.emojis?.cache?.find((e) => e.name === emojiName) ||
-                client.application?.emojis?.cache?.find((e) => e.name === emojiName);
-  if (found) {
-    return `<:${found.name}:${found.id}>`;
-  }
-  return fallbackEmoji;
-}
+const { getGameEmoji } = require("../../utils/emojiHelper");
 
 /**
  * Gắn các emoji riêng của từng game vào bài viết tóm tắt
@@ -72,15 +60,20 @@ function applyGameThemeEmojis(client, gameKey, text) {
   const config = GAME_FORUM_CONFIG[gameKey] || GAME_FORUM_CONFIG.genshin;
   const p = config.emojiPrefix;
 
-  // Lấy các emoji custom nếu bạn đã upload lên bot
-  const bell = getEmoji(client, `${p}_bell`, "📢");
-  const calendar = getEmoji(client, `${p}_calendar`, "📅");
-  const banner = getEmoji(client, `${p}_intertwined` || `${p}_special_pass` || `${p}_radiant`, "⚔️");
-  const map = getEmoji(client, `${p}_map`, "🗺️");
-  const gift = getEmoji(client, `${p}_gift`, "🎁");
-  const qol = getEmoji(client, `${p}_qol`, "⚙️");
-  const mail = getEmoji(client, `${p}_mail`, "📬");
-  const currency = config.defaultCurrencyEmoji;
+  // Lấy các emoji custom theo style từng game
+  const bell = getGameEmoji(client, `${p}_bell`, "📢");
+  const calendar = getGameEmoji(client, `${p}_calendar`, "📅");
+  
+  let bannerEmojiKey = "gi_intertwined";
+  if (gameKey === "hsr") bannerEmojiKey = "hsr_special_pass";
+  else if (gameKey === "zzz") bannerEmojiKey = "zzz_encrypted_tape";
+  else if (gameKey === "wuwa") bannerEmojiKey = "wuwa_radiant";
+  const banner = getGameEmoji(client, bannerEmojiKey, "⚔️");
+
+  const map = getGameEmoji(client, `${p}_map`, "🗺️");
+  const gift = getGameEmoji(client, `${p}_gift`, "🎁");
+  const qol = getGameEmoji(client, `${p}_qol`, "⚙️");
+  const mail = getGameEmoji(client, `${p}_mail`, "📬");
 
   let formatted = text
     .replace(/(?:^|\n)(?:•\s*)?\*?\*?Phiên bản & Thời gian/gi, `\n${calendar} **Phiên bản & Thời gian`)
@@ -92,11 +85,11 @@ function applyGameThemeEmojis(client, gameKey, text) {
 
   // Thay thế các từ khóa tiền tệ bằng custom emoji
   formatted = formatted
-    .replace(/(Primogem|Nguyên Thạch)/gi, `${getEmoji(client, 'gi_primo', currency)} Nguyên Thạch`)
-    .replace(/(Stellar Jade|Ngọc Ánh Sao)/gi, `${getEmoji(client, 'hsr_jade', currency)} Ngọc Ánh Sao`)
-    .replace(/(Polychrome|Phim Màu)/gi, `${getEmoji(client, 'zzz_poly', currency)} Phim Màu`)
-    .replace(/(Astrite)/gi, `${getEmoji(client, 'wuwa_astrite', currency)} Astrite`)
-    .replace(/(Oroberyl)/gi, `${getEmoji(client, 'ef_oroberyl', currency)} Oroberyl`);
+    .replace(/(Primogem|Nguyên Thạch)/gi, `${getGameEmoji(client, 'gi_primo')} Nguyên Thạch`)
+    .replace(/(Stellar Jade|Ngọc Ánh Sao)/gi, `${getGameEmoji(client, 'hsr_jade')} Ngọc Ánh Sao`)
+    .replace(/(Polychrome|Phim Màu)/gi, `${getGameEmoji(client, 'zzz_poly')} Phim Màu`)
+    .replace(/(Astrite)/gi, `${getGameEmoji(client, 'wuwa_astrite')} Astrite`)
+    .replace(/(Oroberyl)/gi, `${getGameEmoji(client, 'ef_oroberyl')} Oroberyl`);
 
   return formatted.trim();
 }

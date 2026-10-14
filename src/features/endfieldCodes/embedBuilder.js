@@ -11,7 +11,7 @@ const { getGameEmoji } = require("../../utils/emojiHelper");
  */
 function formatEndfieldRewards(rewardsText, client) {
   if (!rewardsText) return "Chưa có thông tin phần thưởng";
-  const gemEmoji = getGameEmoji(client, "ef_oroberyl", `<:endfield_oroberyl:${ENDFIELD_OROBERYL_ID || "1559559314652528770"}>`);
+  const gemEmoji = getGameEmoji(client, "ef_oroberyl", "<:ef_oroberyl:1559620935596769460>");
   const tcreditEmoji = getGameEmoji(client, "ef_tcredit", "🪙");
 
   // Tách dòng và làm sạch
@@ -41,9 +41,8 @@ function formatEndfieldRewards(rewardsText, client) {
  * @returns {Promise<{ embed: EmbedBuilder, components: ActionRowBuilder[] }>}
  */
 async function createEndfieldCodeEmbed(codeObj, client) {
-  const logoId = ENDFIELD_LOGO_ID || "1559559318309969970";
-  const gameEmojiStr = `<:endfield_logo:${logoId}>`;
-  const iconUrl = `https://cdn.discordapp.com/emojis/${logoId}.png`;
+  const logoEmojiStr = getGameEmoji(client, "ef_logo", "<:ef_logo:1559620933579178055>");
+  const iconUrl = "https://cdn.discordapp.com/emojis/1559620933579178055.png";
 
   const giftIcon = getGameEmoji(client, "ef_gift", "🎁");
   const bellIcon = getGameEmoji(client, "ef_bell", "📢");
@@ -59,7 +58,7 @@ async function createEndfieldCodeEmbed(codeObj, client) {
     `*Cách nhập: Mở Menu ➔ Cài đặt ➔ Tài khoản ➔ Đổi mã (Exchange Code)*`;
 
   const embed = new EmbedBuilder()
-    .setTitle(`${gameEmojiStr} ${bellIcon} Mã code mới cho Arknights: Endfield!`)
+    .setTitle(`${logoEmojiStr} ${bellIcon} Mã code mới cho Arknights: Endfield!`)
     .setColor("#FFB800")
     .setThumbnail(iconUrl)
     .setDescription(description)
@@ -79,9 +78,8 @@ async function createEndfieldCodeEmbed(codeObj, client) {
  * @returns {Promise<{ embed: EmbedBuilder, components: ActionRowBuilder[] }>}
  */
 async function createEndfieldLivestreamMessage(streamData, client) {
-  const logoId = ENDFIELD_LOGO_ID || "1559559318309969970";
-  const gameEmojiStr = `<:endfield_logo:${logoId}>`;
-  const iconUrl = `https://cdn.discordapp.com/emojis/${logoId}.png`;
+  const logoEmojiStr = getGameEmoji(client, "ef_logo", "<:ef_logo:1559620933579178055>");
+  const iconUrl = "https://cdn.discordapp.com/emojis/1559620933579178055.png";
 
   const giftIcon = getGameEmoji(client, "ef_gift", "🎁");
   const bellIcon = getGameEmoji(client, "ef_bell", "📢");

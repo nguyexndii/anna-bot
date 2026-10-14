@@ -85,6 +85,7 @@ async function checkAndNotifyHoyoCodes(client) {
       }
     }
 
+    let newCodesCount = 0;
     // 4. Lọc và gửi thông báo cho code mới
     for (const codeObj of liveCodesList) {
       const codeKey = `${codeObj.game}_${codeObj.code}`;
@@ -100,6 +101,7 @@ async function checkAndNotifyHoyoCodes(client) {
       // 1. Code chưa từng xuất hiện trong kênh Discord (!isAlreadyInChannel)
       // 2. VÀ Code KHÔNG PHẢI là code cũ trước thời điểm kích hoạt hôm nay (!isAlreadyKnown && (!existingDoc || !existingDoc.notified))
       if (!isAlreadyInChannel && !isAlreadyKnown && (!existingDoc || !existingDoc.notified)) {
+        newCodesCount++;
         console.log(`🎉 [Hoyo Code Watcher] PHÁT HIỆN CODE MỚI TINH (${codeObj.game.toUpperCase()}): "${codeObj.code}"!`);
 
         // Lưu vào DB & Set bộ nhớ
@@ -126,7 +128,7 @@ async function checkAndNotifyHoyoCodes(client) {
         // Gửi tin nhắn Embed kèm nút bấm
         if (channel && channel.isTextBased()) {
           try {
-            const { embed, components } = createHoyoCodeMessage(codeObj);
+            const { embed, components } = createHoyoCodeMessage(codeObj, client);
             const roleMention = HOYO_ROLE_ID ? `<@&${HOYO_ROLE_ID}>` : null;
             await channel.send({
               content: roleMention || undefined,
@@ -148,8 +150,21 @@ async function checkAndNotifyHoyoCodes(client) {
         }
       }
     }
+
+    return {
+      success: true,
+      totalScraped: liveCodesList.length,
+      newCount: newCodesCount,
+      message: newCodesCount > 0
+        ? `Đã phát hiện và gửi thông báo cho **${newCodesCount} mã code mới**!`
+        : `Tất cả **${liveCodesList.length} mã code** hiện có (Genshin, HSR, ZZZ) đều đã được lưu trữ trước đó. Không có code mới.`,
+    };
   } catch (err) {
     console.error("❌ [Hoyo Code Watcher] Lỗi trong chu kỳ kiểm tra code:", err);
+    return {
+      success: false,
+      message: `Đã xảy ra lỗi khi kết nối hoặc xử lý: ${err.message}`,
+    };
   }
 }
 
