@@ -268,10 +268,10 @@ client.once(Events.ClientReady, async () => {
     console.error("❌ Lỗi khởi tạo Endfield Code Watcher:", err.message);
   }
 
-  // Initialize Gacha Updates Forum Watcher (Tự động tóm tắt & đăng bài Forum)
+  // Initialize Gacha Updates Watcher (Tự động tóm tắt & đăng bài Bảng Tin Gacha)
   try {
     initGachaUpdateWatcher(client);
-    console.log(`🏛️ Kênh Forum Cập Nhật Gacha Games đã kích hoạt tại kênh <#${GACHA_UPDATE_FORUM_CHANNEL_ID}>`);
+    console.log(`📰 Kênh Bảng Tin Cập Nhật Gacha Games đã kích hoạt tại kênh <#${GACHA_UPDATE_FORUM_CHANNEL_ID}>`);
   } catch (err) {
     console.error("❌ Lỗi khởi tạo Gacha Update Watcher:", err.message);
   }
@@ -593,7 +593,7 @@ client.on(Events.MessageCreate, async (message) => {
 
         const payload = buildForumPostPayload(client, updateData, sampleSummary);
         await message.channel.send({
-          content: `📌 **[TEST FORUM PREVIEW] Tiêu đề Thread:** \`${payload.threadName}\``,
+          content: `📰 **[TEST XEM TRƯỚC BẢNG TIN] Tiêu đề:** \`${payload.threadName}\``,
           embeds: payload.message.embeds,
           components: payload.message.components,
         });

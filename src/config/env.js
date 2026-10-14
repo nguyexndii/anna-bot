@@ -23,6 +23,7 @@ const PROD_CHANNELS = {
   HOYO_CODES: "1528768068581457930",     // Kênh Săn Code HoYoverse chính thức
   ENDFIELD_CODES: "1528768068581457930", // Kênh Săn Code Endfield chính thức
   RULES: "1450073214620405903",          // Kênh Luật chơi chính
+  GACHA_UPDATES: "1559744328899887195",  // Kênh Bảng Tin Cập Nhật Gacha chính thức
 };
 
 const TEST_CHANNELS = {
@@ -80,8 +81,8 @@ module.exports = {
     .map((id) => id.trim())
     .filter(Boolean),
 
-  // Kênh Forum Cập Nhật Gacha Games (Đa Game)
-  GACHA_UPDATE_FORUM_CHANNEL_ID: process.env.GACHA_UPDATE_FORUM_CHANNEL_ID || "1559612707605319710",
+  // Kênh Bảng Tin Cập Nhật Gacha Games (Đa Game - Kênh Chat Thường / Kênh Thông Báo)
+  GACHA_UPDATE_FORUM_CHANNEL_ID: process.env.GACHA_UPDATE_CHANNEL_ID || process.env.GACHA_UPDATE_FORUM_CHANNEL_ID || "1559744328899887195",
 
   // Gemini config (Model: gemini-3.8-flash với fallback 3.5-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(",").map((k) => k.trim()).filter(Boolean),
