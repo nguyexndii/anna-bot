@@ -5,7 +5,7 @@ if (dns && typeof dns.setDefaultResultOrder === "function") {
   dns.setDefaultResultOrder("ipv4first");
 }
 const express = require("express");
-const { Client, GatewayIntentBits, Events } = require("discord.js");
+const { Client, GatewayIntentBits, Events, EmbedBuilder } = require("discord.js");
 
 const {
   DISCORD_TOKEN,
@@ -28,7 +28,7 @@ const {
 const { initStatusNotifier } = require("./src/utils/statusNotifier");
 
 // 24/7 Smart Voice Room Keeper
-const { initVoiceKeeper, getVoiceKeeperStatus } = require("./src/features/voiceKeeper");
+const { initVoiceKeeper, getVoiceKeeperStatus, forceLeaveVoice, evaluateVoiceRoom } = require("./src/features/voiceKeeper");
 
 const isAllowedGuild = (guildId) => {
   if (!ALLOWED_GUILD_IDS || ALLOWED_GUILD_IDS.length === 0) return true;
@@ -351,6 +351,48 @@ client.on(Events.MessageCreate, async (message) => {
         const { createHealthDashboardEmbed } = require("./src/utils/healthTracker");
         const embed = createHealthDashboardEmbed();
         return message.channel.send({ embeds: [embed] });
+      }
+    }
+
+    // 0.08 Lệnh Quản trị kiểm tra & điều khiển Voice Keeper (!checkvoice, !leavevoice, !outvoice, !evalvoice)
+    if (lowerRaw === "!checkvoice" || lowerRaw === "!acheckvoice" || lowerRaw === "!voiceinfo") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const vStatus = getVoiceKeeperStatus();
+        const meVoice = message.guild.members.me?.voice;
+        const currentChannelId = meVoice?.channelId;
+        const embed = new EmbedBuilder()
+          .setTitle("🔊 Trạng Thái Voice Keeper (Giữ Room 24/7)")
+          .setColor(vStatus.isHolding ? 0x57F287 : 0x5865F2)
+          .addFields(
+            { name: "Trạng thái", value: `\`${vStatus.state}\` (${vStatus.isHolding ? "🟢 Đang giữ phòng" : "⚪ Nghỉ / Rời phòng"})`, inline: true },
+            { name: "Phòng mục tiêu", value: `<#${vStatus.targetChannelId}> (\`${vStatus.channelName}\`)`, inline: true },
+            { name: "Voice kết nối thực tế", value: currentChannelId ? `<#${currentChannelId}>` : "*Không kết nối*", inline: true },
+            { name: "Người thật trong phòng", value: `\`${vStatus.humanCount}\` người`, inline: true },
+            { name: "Bot Nhạc (Anna Music)", value: vStatus.hasMusicBot ? "✅ Có mặt" : "❌ Không có", inline: true },
+            { name: "Quy tắc Cần giữ phòng?", value: vStatus.shouldHoldRoom ? "✅ Cần giữ" : "❌ An toàn (Nhường chỗ)", inline: true },
+            { name: "Voice Connection", value: `\`${vStatus.connectionState}\``, inline: true },
+            { name: "Lý do đánh giá gần nhất", value: `\`${vStatus.lastActionReason || "N/A"}\``, inline: true },
+            { name: "Thời gian đánh giá", value: vStatus.lastEvaluatedAt ? `<t:${Math.floor(new Date(vStatus.lastEvaluatedAt).getTime() / 1000)}:R>` : "N/A", inline: true }
+          )
+          .setFooter({ text: "Gõ !leavevoice để ép bot out phòng | !evalvoice để bot tự kiểm tra lại ngay" });
+        return message.channel.send({ embeds: [embed] });
+      }
+    }
+
+    if (lowerRaw === "!leavevoice" || lowerRaw === "!outvoice" || lowerRaw === "!aleavevoice") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        await forceLeaveVoice(message.guild);
+        return message.channel.send("👋 **[Voice Keeper]** Đã ngắt kết nối và ép bot rời toàn bộ voice room thành công!");
+      }
+    }
+
+    if (lowerRaw === "!evalvoice" || lowerRaw === "!aevalvoice") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        await evaluateVoiceRoom(message.guild, "admin_manual_trigger");
+        return message.channel.send("🔄 **[Voice Keeper]** Đã kích hoạt tái đánh giá phòng voice ngay lập tức. Gõ `!checkvoice` để xem trạng thái mới!");
       }
     }
 

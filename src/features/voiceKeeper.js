@@ -55,7 +55,9 @@ async function sendKeeperDiscordLog(guild, { title, desc, color, fields = [] }) 
 
 let currentConnection = null;
 let debounceTimer = null;
+let reconnectTimer = null;
 let isJoining = false;
+let isIntentionalDisconnect = false;
 
 const status = {
   enabled: ENABLE_VOICE_KEEPER,
@@ -96,9 +98,12 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
   if (!guild || !KEEP_VOICE_CHANNEL_ID) return;
 
   try {
-    const channel =
-      guild.channels.cache.get(KEEP_VOICE_CHANNEL_ID) ||
-      (await guild.channels.fetch(KEEP_VOICE_CHANNEL_ID).catch(() => null));
+    let channel = null;
+    try {
+      channel = await guild.channels.fetch(KEEP_VOICE_CHANNEL_ID, { force: true });
+    } catch (_) {
+      channel = guild.channels.cache.get(KEEP_VOICE_CHANNEL_ID);
+    }
 
     if (!channel || !channel.isVoiceBased()) {
       status.state = "error";
@@ -137,7 +142,11 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
     status.lastEvaluatedAt = new Date().toISOString();
     status.lastActionReason = reason;
 
-    const botIsInside = channel.members.has(guild.client.user.id);
+    const myVoiceState = guild.members.me?.voice;
+    const isConnectedViaVoiceState = Boolean(myVoiceState && myVoiceState.channelId === channel.id);
+    const isConnectedViaChannel = channel.members.has(guild.client.user.id);
+    const isConnectedViaVoiceLib = Boolean(currentConnection && currentConnection.state.status !== VoiceConnectionStatus.Destroyed);
+    const botIsInside = isConnectedViaVoiceState || isConnectedViaChannel || isConnectedViaVoiceLib;
 
     // =========================================================================
     // CASE 1: CẦN GIỮ PHÒNG (shouldHoldRoom === true)
@@ -149,6 +158,11 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
           `[VoiceKeeper] 🛡️ Cần giữ phòng "${channel.name}" (humans: ${humanCount}, musicBot: ${hasMusicBot ? "Có" : "Không"}). Bot phụ bắt đầu kết nối... (Lý do: ${reason})`
         );
         isJoining = true;
+        isIntentionalDisconnect = false;
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
         status.state = "connecting";
 
         try {
@@ -190,15 +204,21 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
           });
 
           currentConnection.on(VoiceConnectionStatus.Disconnected, async () => {
+            if (isIntentionalDisconnect) return;
+
             try {
               await Promise.race([
                 entersState(currentConnection, VoiceConnectionStatus.Signalling, 5_000),
                 entersState(currentConnection, VoiceConnectionStatus.Connecting, 5_000),
               ]);
             } catch {
+              if (isIntentionalDisconnect) return;
+
               console.warn(`[VoiceKeeper] ⚠️ Mất kết nối voice, đang dọn dẹp để kết nối lại...`);
               if (currentConnection) {
-                currentConnection.destroy();
+                try {
+                  currentConnection.destroy();
+                } catch (_) {}
                 currentConnection = null;
               }
               status.state = "disconnected";
@@ -216,7 +236,9 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
               });
 
               // Retry after 3 seconds if room still needs holding
-              setTimeout(() => {
+              if (reconnectTimer) clearTimeout(reconnectTimer);
+              reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
                 evaluateVoiceRoom(guild, "reconnect_after_disconnect");
               }, 3000);
             }
@@ -245,7 +267,7 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
     // -> Đã có Bot Nhạc + từ 2 người thật trở lên, bot phụ rời đi nhường chỗ
     // =========================================================================
     else {
-      if (botIsInside || currentConnection) {
+      if (botIsInside || currentConnection || isConnectedViaVoiceState) {
         console.log(
           `[VoiceKeeper] 👋 Phòng "${channel.name}" đã an toàn (có Bot Nhạc + ${humanCount} người thật >= 2). Bot phụ rời phòng nhường chỗ!`
         );
@@ -261,6 +283,14 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
           ]
         });
 
+        // Đánh dấu disconnect có chủ đích để Disconnected event không kích hoạt reconnect loop
+        isIntentionalDisconnect = true;
+        if (reconnectTimer) {
+          clearTimeout(reconnectTimer);
+          reconnectTimer = null;
+        }
+
+        // 1. Phá hủy connection của @discordjs/voice
         if (currentConnection) {
           try {
             currentConnection.destroy();
@@ -270,13 +300,25 @@ async function evaluateVoiceRoom(guild, reason = "unknown") {
           currentConnection = null;
         }
 
-        // Double check getVoiceConnection
+        // Dọn dẹp connection tồn đọng nếu có
         const existingConn = getVoiceConnection(guild.id);
         if (existingConn) {
           try {
             existingConn.destroy();
           } catch (_) {}
         }
+
+        // 2. Ép GuildMember ngắt kết nối voice ở Discord Gateway để chống kẹt ghost state
+        try {
+          await guild.members.me?.voice?.disconnect();
+        } catch (voiceErr) {
+          console.warn(`[VoiceKeeper] Warning when disconnecting voice state:`, voiceErr.message);
+        }
+
+        // Mở lại cờ sau 2.5 giây khi các event gateway đã ổn định
+        setTimeout(() => {
+          isIntentionalDisconnect = false;
+        }, 2500);
 
         isJoining = false;
         status.state = "idle";
@@ -331,6 +373,11 @@ function initVoiceKeeper(client) {
 
   // 2. Listen to Voice State Updates (members joining/leaving/switching voice)
   client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+    // Bỏ qua nếu chính bot đang thực hiện rời phòng có chủ đích
+    if (oldState.id === client.user.id || newState.id === client.user.id) {
+      if (isIntentionalDisconnect) return;
+    }
+
     // Check if the event relates to our target voice channel
     const isTargetChannel =
       oldState.channelId === KEEP_VOICE_CHANNEL_ID ||
@@ -339,14 +386,15 @@ function initVoiceKeeper(client) {
     if (!isTargetChannel) return;
 
     // Kiểm tra loại sự kiện: Nếu có ai đó (người hoặc bot nhạc) rời khỏi phòng mục tiêu
-    // -> Cần phản ứng nhanh (600ms) để giữ phòng kịp thời, không bị hở thời gian
+    // -> Cần phản ứng nhanh (800ms) để giữ phòng kịp thời, không bị hở thời gian
     const isLeaveEvent =
       oldState.channelId === KEEP_VOICE_CHANNEL_ID &&
       newState.channelId !== KEEP_VOICE_CHANNEL_ID;
-    const debounceMs = isLeaveEvent ? 600 : 1200;
+    const debounceMs = isLeaveEvent ? 800 : 1500;
 
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
+      debounceTimer = null;
       const guild = newState.guild || oldState.guild || (await getTargetGuild());
       if (guild) {
         await evaluateVoiceRoom(guild, `voice_state_update:${isLeaveEvent ? "member_left" : "state_changed"}`);
@@ -363,8 +411,53 @@ function initVoiceKeeper(client) {
   }, 3 * 60 * 1000);
 }
 
+/**
+ * Force disconnect bot from any voice channel in the guild (Lệnh Admin ép bot out)
+ * @param {import("discord.js").Guild} guild
+ */
+async function forceLeaveVoice(guild) {
+  if (!guild) return false;
+  isIntentionalDisconnect = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+
+  if (currentConnection) {
+    try {
+      currentConnection.destroy();
+    } catch (_) {}
+    currentConnection = null;
+  }
+
+  const existingConn = getVoiceConnection(guild.id);
+  if (existingConn) {
+    try {
+      existingConn.destroy();
+    } catch (_) {}
+  }
+
+  try {
+    await guild.members.me?.voice?.disconnect();
+  } catch (_) {}
+
+  setTimeout(() => {
+    isIntentionalDisconnect = false;
+  }, 2500);
+
+  isJoining = false;
+  status.state = "idle";
+  status.isHolding = false;
+  return true;
+}
+
 module.exports = {
   initVoiceKeeper,
   getVoiceKeeperStatus,
   evaluateVoiceRoom,
+  forceLeaveVoice,
 };
