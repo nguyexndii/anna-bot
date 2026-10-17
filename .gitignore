@@ -1,5 +1,32 @@
-.env
+# Dependencies
 node_modules/
-.DS_Store
+
+# Environment & Credentials
+.env
+.env.*
+!.env.example
+vps_*.json
+
+# Operational & Dispatch Functional Scripts (Các script chức năng vận hành / dispatch)
+scripts/
+*.scratch.js
+scratch/
+
+# Runtime Data & Game State
+data/
 src/data/active_*.json
 src/data/leaderboard_*.json
+src/data/*.json
+*.tmp
+
+# Logs & Dumps
+*.log
+logs/
+*.txt
+*.zip
+
+# System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

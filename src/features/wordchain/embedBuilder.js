@@ -92,7 +92,7 @@ function createHelpEmbed() {
       "✦ `!score` hoặc `!diem`: Xem điểm số ván chơi hiện tại.\n" +
       "✦ `!huongdan` hoặc `!luatchoi`: Xem lại hướng dẫn này."
     )
-    .setFooter({ text: "⏱️ Hướng dẫn này sẽ tự động xóa sau 1 phút để giữ kênh chat sạch đẹp." });
+    .setFooter({ text: "Chúc bạn chơi game vui vẻ tại Khu Giải Trí!" });
 }
 
 /**

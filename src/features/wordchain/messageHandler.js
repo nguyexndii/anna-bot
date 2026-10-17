@@ -22,7 +22,6 @@ const {
 } = require("./embedBuilder");
 const { sendWebhook } = require("../../utils/webhook.service");
 const { applySmartMoveReaction } = require("../../utils/emojiManager");
-const { checkVulgarAndMute } = require("../../utils/moderationHelper");
 const { WORDCHAIN_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
 
 const isAdmin = (userId) => (ADMIN_IDS && ADMIN_IDS.length > 0) ? ADMIN_IDS.includes(userId) : userId === ADMIN_ID;
@@ -152,10 +151,6 @@ function onWordChainMessage(client) {
   return async (message) => {
     if (message.author.bot) return;
 
-    // Check for vulgar language and Mute 3 minutes if detected
-    const isMuted = await checkVulgarAndMute(message);
-    if (isMuted) return;
-
     const content = message.content.trim();
     const rawLower = content.toLowerCase();
     const userId = message.author.id;
@@ -258,15 +253,11 @@ function onWordChainMessage(client) {
 
     if (rawLower === "!luatchoi" || rawLower === "!help" || rawLower === "!huongdan") {
       const embed = createHelpEmbed();
-      const sentMsg = await sendWebhook(
+      await sendWebhook(
         webhookUrl || "wordchain",
         { embeds: [embed] },
         message.channel
       );
-      if (sentMsg && typeof sentMsg.delete === "function") {
-        setTimeout(() => sentMsg.delete().catch(() => {}), 60000);
-      }
-      setTimeout(() => message.delete().catch(() => {}), 5000);
       return;
     }
 

@@ -343,13 +343,6 @@ client.on(Events.MessageCreate, async (message) => {
   if (!message.guild || !isAllowedGuild(message.guild.id)) return;
 
   try {
-    // 0.0 Lệnh Quản trị Xóa tin nhắn (!clear <x>, !xoa <x>)
-    if (message.content.startsWith("!clear") || message.content.startsWith("!xoa")) {
-      const { handleClearCommand } = require("./src/features/adminCommands");
-      const handled = await handleClearCommand(client, message);
-      if (handled) return;
-    }
-
     const lowerRaw = message.content.trim().toLowerCase();
 
     // 0.05 Lệnh Kiểm tra Sức khỏe Toàn bộ Dịch vụ (!status, !health, !astatus, !ahealth)

@@ -12,7 +12,6 @@ const {
   createScrambleHelpEmbed,
 } = require("./embedBuilder");
 const { applySmartMoveReaction } = require("../../utils/emojiManager");
-const { checkVulgarAndMute } = require("../../utils/moderationHelper");
 const { sendWebhook } = require("../../utils/webhook.service");
 const { WORDSCRAMBLE_CHANNEL_ID, ADMIN_IDS, ADMIN_ID } = require("../../config/env");
 
@@ -32,10 +31,6 @@ const SCRAMBLE_HINT_COOLDOWN_MS = 60000; // 60 giây Cooldown chống spam
 function onWordScrambleMessage(client) {
   return async (message) => {
     if (!message.guild || message.author.bot) return;
-
-    // Check for vulgar language and Mute 3 minutes if detected
-    const isMuted = await checkVulgarAndMute(message);
-    if (isMuted) return;
 
     const rawContent = message.content.trim().toLowerCase();
     const state = getScrambleState();
@@ -138,11 +133,7 @@ function onWordScrambleMessage(client) {
       rawContent === "!help"
     ) {
       const guideEmbed = createScrambleHelpEmbed();
-      const sentMsg = await sendWebhook(webhookUrl || "wordscramble", { embeds: [guideEmbed] }, message.channel);
-      if (sentMsg && typeof sentMsg.delete === "function") {
-        setTimeout(() => sentMsg.delete().catch(() => {}), 60000);
-      }
-      setTimeout(() => message.delete().catch(() => {}), 5000);
+      await sendWebhook(webhookUrl || "wordscramble", { embeds: [guideEmbed] }, message.channel);
       return;
     }
 
