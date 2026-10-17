@@ -414,6 +414,25 @@ client.on(Events.MessageCreate, async (message) => {
       }
     }
 
+    // 0.095 Lệnh Admin kiểm tra gửi log lỗi vào kênh log kèm tag (!testerror, !testerr, !testlog)
+    if (lowerRaw === "!testerror" || lowerRaw === "!testerr" || lowerRaw === "!testlog") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const { sendAdminDM, getVietnamTime } = require("./src/utils/statusNotifier");
+        await sendAdminDM(client, message.author.id, {
+          title: "🧪 [TEST LOG] Kiểm Tra Kênh Báo Lỗi Hệ Thống",
+          description: `Đây là thông báo thử nghiệm gửi log vào kênh <#1547449482835394640> kèm tag trực tiếp Admin.`,
+          color: 0xe67e22, // Cam
+          fields: [
+            { name: "⏰ Thời gian test", value: `\`${getVietnamTime()}\` (Giờ VN)`, inline: true },
+            { name: "👤 Người kích hoạt", value: `<@${message.author.id}>`, inline: true },
+            { name: "📋 Trạng thái", value: "✅ Hoạt động bình thường", inline: true },
+          ],
+        });
+        return message.channel.send(`✅ Đã gửi tin nhắn log thử nghiệm vào kênh <#1547449482835394640> và tag <@${message.author.id}>!`);
+      }
+    }
+
     // 0.1 Lệnh Admin ép quét code HoYoverse tức thì (!checkhoyo, !acheckhoyo)
     if (lowerRaw === "!checkhoyo" || lowerRaw === "!acheckhoyo") {
       const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");

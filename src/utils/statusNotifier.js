@@ -1,4 +1,7 @@
 const { EmbedBuilder, Events } = require("discord.js");
+const { ADMIN_ID, ERROR_LOG_CHANNEL_ID: CONFIG_ERROR_LOG_CHANNEL_ID } = require("../config/env");
+
+const ERROR_LOG_CHANNEL_ID = process.env.ERROR_LOG_CHANNEL_ID || CONFIG_ERROR_LOG_CHANNEL_ID || "1547449482835394640";
 
 /**
  * Lấy thời gian định dạng chuẩn Việt Nam (Asia/Ho_Chi_Minh)
@@ -33,38 +36,57 @@ function formatDuration(seconds) {
 }
 
 /**
- * Gửi tin nhắn Embed DM an toàn tới User ID của Admin
+ * Gửi tin nhắn Embed cảnh báo/lỗi trực tiếp vào Kênh Log Lỗi (1547449482835394640) kèm Tag Admin
+ * (Loại bỏ hoàn toàn tính năng gửi DM riêng)
  */
-async function sendAdminDM(client, adminId, { title, description, color, fields }) {
-  if (!client || !adminId) return;
+async function sendLogAlert(client, adminId, { title, description, color, fields, mentionAdmin = true }) {
+  if (!client) return;
   try {
-    const user = await client.users.fetch(adminId).catch(() => null);
-    if (!user) {
-      console.warn(`[StatusNotifier] Không thể tìm thấy Discord User ID ${adminId}`);
-      return;
-    }
+    const targetAdminId = adminId || ADMIN_ID || "875358286487097395";
 
     const embed = new EmbedBuilder()
       .setTitle(title)
       .setDescription(description || null)
-      .setColor(color)
+      .setColor(color || 0xe74c3c)
       .setTimestamp(new Date());
 
     if (fields && Array.isArray(fields) && fields.length > 0) {
       embed.addFields(fields);
     }
 
-    await user.send({ embeds: [embed] }).catch((dmErr) => {
-      console.warn(`[StatusNotifier] Không thể gửi DM tới ${adminId}:`, dmErr.message);
-    });
-    console.log(`[StatusNotifier] Đã gửi thành công tin nhắn DM ("${title}") tới Admin ID ${adminId}`);
+    // Gửi trực tiếp vào Kênh Log Lỗi chỉ định (1547449482835394640) kèm Tag Admin
+    if (ERROR_LOG_CHANNEL_ID) {
+      const channel =
+        client.channels.cache.get(ERROR_LOG_CHANNEL_ID) ||
+        (await client.channels.fetch(ERROR_LOG_CHANNEL_ID).catch(() => null));
+
+      if (channel && channel.isTextBased()) {
+        const mentionContent = (mentionAdmin && targetAdminId) ? `<@${targetAdminId}>` : null;
+
+        await channel.send({
+          content: mentionContent,
+          embeds: [embed],
+          allowedMentions: { users: targetAdminId ? [targetAdminId] : [] },
+        }).catch((chErr) => {
+          console.warn(`[StatusNotifier] Không thể gửi vào kênh log ${ERROR_LOG_CHANNEL_ID}:`, chErr.message);
+        });
+
+        console.log(`[StatusNotifier] 🚨 Đã gửi cảnh báo ("${title}") và tag Admin <@${targetAdminId}> vào kênh <#${ERROR_LOG_CHANNEL_ID}>`);
+        return;
+      }
+    }
+
+    console.warn(`[StatusNotifier] ⚠️ Không tìm thấy Kênh Log Lỗi (ID: ${ERROR_LOG_CHANNEL_ID}) để gửi cảnh báo: "${title}"`);
   } catch (err) {
     console.warn("[StatusNotifier Alert Error]:", err.message);
   }
 }
 
+// Giữ alias sendAdminDM để tương thích ngược với các module đang gọi
+const sendAdminDM = sendLogAlert;
+
 /**
- * Khởi tạo bộ giám sát trạng thái và tự động thông báo qua DM cho Anna Bot
+ * Khởi tạo bộ giám sát trạng thái và tự động thông báo vào Kênh Log Lỗi cho Anna Bot
  * @param {import('discord.js').Client} client 
  * @param {Object} options 
  * @param {string} options.adminId ID tài khoản nhận DM
@@ -201,5 +223,6 @@ function initStatusNotifier(client, options = {}) {
 module.exports = {
   initStatusNotifier,
   sendAdminDM,
+  sendLogAlert,
   getVietnamTime,
 };

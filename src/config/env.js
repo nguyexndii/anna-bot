@@ -84,6 +84,9 @@ module.exports = {
   // Kênh Bảng Tin Cập Nhật Gacha Games (Đa Game - Kênh Chat Thường / Kênh Thông Báo)
   GACHA_UPDATE_FORUM_CHANNEL_ID: process.env.GACHA_UPDATE_CHANNEL_ID || process.env.GACHA_UPDATE_FORUM_CHANNEL_ID || "1559744328899887195",
 
+  // Kênh Báo Lỗi & Cảnh Báo Hệ Thống (a_log-error / bot-health-error)
+  ERROR_LOG_CHANNEL_ID: process.env.ERROR_LOG_CHANNEL_ID || (CHANNELS && CHANNELS.ERROR_LOG) || "1547449482835394640",
+
   // Gemini config (Model: gemini-3.8-flash với fallback 3.5-flash-lite)
   GEMINI_API_KEYS: (process.env.GEMINI_API_KEYS || "").split(",").map((k) => k.trim()).filter(Boolean),
   GEMINI_MODEL_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=",

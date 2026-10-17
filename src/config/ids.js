@@ -18,6 +18,7 @@ module.exports = {
     WUWA_CODES: process.env.WUWA_CHANNEL_ID || "1528768068581457930",    // Kênh thông báo Code WuWa chính thức
     HOYO_CODES: process.env.HOYO_CODES_CHANNEL_ID || "1528768068581457930", // Kênh thông báo Code HoYoverse chính thức
     ENDFIELD_CODES: process.env.ENDFIELD_CODES_CHANNEL_ID || "1528768068581457930", // Kênh thông báo Code Endfield chính thức
+    ERROR_LOG: process.env.ERROR_LOG_CHANNEL_ID || "1547449482835394640", // Kênh log lỗi hệ thống & cảnh báo (a_log-error)
   },
 
   // Emoji IDs (Application Emojis)
