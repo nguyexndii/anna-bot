@@ -64,20 +64,9 @@ async function checkAndPublishGachaUpdates(client) {
           threadId = thread.id;
           console.log(`[GachaUpdates] ✅ Đã đăng bài thành công lên Forum: [${thread.name}] (Thread ID: ${thread.id})`);
         } else {
-          // 2. Chế độ Kênh Chat Thường / Kênh Thông Báo: Gửi trực tiếp bản tin vào kênh
+          // 2. Chế độ Kênh Chat Thường / Kênh Thông Báo: Gửi trực tiếp bản tin thường vào kênh
           const sentMsg = await channel.send(payload.message);
           threadId = sentMsg.id;
-
-          // Mở luồng thảo luận con dưới tin nhắn nếu kênh hỗ trợ
-          try {
-            const threadName = `Thảo luận: ${payload.threadName}`.slice(0, 95);
-            await sentMsg.startThread({
-              name: threadName,
-              autoArchiveDuration: 1440, // 24 giờ
-            });
-          } catch (threadErr) {
-            // Không có quyền tạo thread hoặc kênh tắt tính năng thread -> bỏ qua
-          }
           console.log(`[GachaUpdates] ✅ Đã đăng bản tin trực tiếp vào kênh chat: [${payload.threadName}] (Message ID: ${sentMsg.id})`);
         }
 
@@ -116,10 +105,10 @@ function initGachaUpdateWatcher(client) {
     checkAndPublishGachaUpdates(client);
   }, 15000);
 
-  // Lên lịch quét định kỳ mỗi 15 phút (900.000 ms)
+  // Lên lịch quét định kỳ mỗi 10 phút (600.000 ms)
   setInterval(() => {
     checkAndPublishGachaUpdates(client);
-  }, 15 * 60 * 1000);
+  }, 10 * 60 * 1000);
 }
 
 module.exports = {

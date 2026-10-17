@@ -122,7 +122,7 @@ async function createEndfieldLivestreamMessage(streamData, client) {
   }
 
   const embed = new EmbedBuilder()
-    .setTitle(`${gameEmojiStr} ${bellIcon} ${codes.length > 0 ? "Code Livestream" : "Thông báo Livestream"} Arknights: Endfield`)
+    .setTitle(`${logoEmojiStr} ${bellIcon} ${codes.length > 0 ? "Code Livestream" : "Thông báo Livestream"} Arknights: Endfield`)
     .setColor("#FFB800")
     .setThumbnail(iconUrl)
     .setDescription(descriptionText)

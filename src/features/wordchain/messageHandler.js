@@ -57,6 +57,37 @@ function scheduleBotTurn(client, channel, webhookUrl = null, autoPlaySec = AUTO_
       const state = getCurrentState();
       if (!state || !state.expectedKey) return;
 
+      // 1. Nếu trạng thái ván ghi nhận lượt gần nhất đã là của Bot/Trọng tài -> Dừng ngay, không tự tiếp chiêu liên tiếp
+      if (state.isBotTurn) {
+        console.log("ℹ️ [WordChain] Lượt trước đã do Bot tiếp chiêu, vẫn chưa có người chơi nào trả lời. Hủy lượt tự động.");
+        return;
+      }
+
+      // 2. Kiểm tra tin nhắn thực tế trong kênh: Tin nhắn mới nhất có phải từ bot/webhook không?
+      if (channel && channel.isTextBased()) {
+        try {
+          const recentMessages = await channel.messages.fetch({ limit: 5 }).catch(() => null);
+          if (recentMessages && recentMessages.size > 0) {
+            const lastMsg = recentMessages.first();
+            const isBotOrWebhook = lastMsg.author.bot || Boolean(lastMsg.webhookId);
+            const isBotContent = lastMsg.content && (
+              lastMsg.content.includes("Trọng tài đã tiếp chiêu") ||
+              lastMsg.content.includes("MINIGAME NỐI TỪ ĐÃ SẴN SÀNG") ||
+              lastMsg.content.includes("Từ mở màn") ||
+              lastMsg.content.includes("Từ hiện tại là:")
+            );
+
+            // Nếu tin nhắn gần nhất trong kênh vẫn là do Bot/Webhook phát ngôn -> Chưa ai rep -> Dừng hẳn
+            if (isBotOrWebhook && isBotContent) {
+              console.log("ℹ️ [WordChain] Tin nhắn mới nhất trong kênh vẫn là của Bot/Webhook, chưa có user nào rep. Không tiếp chiêu.");
+              return;
+            }
+          }
+        } catch (fetchErr) {
+          console.warn("⚠️ [WordChain] Không thể kiểm tra tin nhắn gần nhất:", fetchErr.message);
+        }
+      }
+
       const expectedKey = state.expectedKey;
       console.log(`🤖 Hết ${autoPlaySec}s không ai trả lời, Trọng tài tiếp chiêu 1 lượt cho từ "${expectedKey}"...`);
 
@@ -82,7 +113,8 @@ function scheduleBotTurn(client, channel, webhookUrl = null, autoPlaySec = AUTO_
           botPhrase,
           normalizedBotPhrase,
           client.user.id,
-          "Hệ Thống Trọng Tài"
+          "Hệ Thống Trọng Tài",
+          true // Đánh dấu lượt này là do Bot đi
         );
 
         await sendWebhook(
@@ -104,8 +136,8 @@ function scheduleBotTurn(client, channel, webhookUrl = null, autoPlaySec = AUTO_
           },
           channel
         );
-        // Sau khi đổi ván mới, chờ 3 phút xem có ai chơi không
-        scheduleBotTurn(client, channel, webhookUrl, autoPlaySec);
+        // Sau khi đổi ván mới, DỪNG LẠI CHỜ NGƯỜI CHƠI, KHÔNG gọi scheduleBotTurn!
+        console.log(`🔄 Đã đổi ván mới, dừng lại chờ người chơi mở màn.`);
       }
     } catch (err) {
       console.error("❌ Lỗi trong bot turn timer:", err);
@@ -142,7 +174,7 @@ function onWordChainMessage(client) {
           },
           message.channel
         );
-        scheduleBotTurn(client, message.channel, webhookUrl, AUTO_PLAY_TIMEOUT_SEC);
+        // Chờ người chơi mở màn, không gọi scheduleBotTurn để tránh bot tự chơi một mình
         return;
       }
 
@@ -156,7 +188,7 @@ function onWordChainMessage(client) {
           },
           message.channel
         );
-        scheduleBotTurn(client, message.channel, webhookUrl, AUTO_PLAY_TIMEOUT_SEC);
+        // Chờ người chơi mở màn, không gọi scheduleBotTurn để tránh bot tự chơi một mình
         return;
       }
     }
@@ -241,7 +273,6 @@ function onWordChainMessage(client) {
     // Auto Start Game if inactive
     if (!isGameActive()) {
       startGame(userId, username);
-      scheduleBotTurn(client, message.channel, webhookUrl, AUTO_PLAY_TIMEOUT_SEC);
     }
 
     // Process Player Move
@@ -260,6 +291,12 @@ function onWordChainMessage(client) {
       const normalizedInput = normalize(content);
       const state = getCurrentState();
       const expectedKey = state.expectedKey;
+
+      // 0. Chống 1 người chơi tự nối từ liên tiếp (Self-play exploit)
+      if (state && state.moveCount > 0 && state.lastPlayerId === userId && !state.isBotTurn) {
+        await applySmartMoveReaction(message, false, "reversal");
+        return;
+      }
 
       // 1. Check first word match (Sai vần -> Bonk, Noob, Dumb)
       if (normalize(firstWord) !== normalize(expectedKey)) {
@@ -310,12 +347,12 @@ function onWordChainMessage(client) {
           message.channel
         );
 
-        scheduleBotTurn(client, message.channel, webhookUrl, AUTO_PLAY_TIMEOUT_SEC);
+        // Chờ người chơi mở màn ván mới, KHÔNG gọi scheduleBotTurn để tránh bot tự chơi
         return;
       }
 
       // 6. Normal Valid Move (Thành công -> Thả reaction ĐÚNG + Cảm xúc vui vẻ)
-      updateState(content, normalizedInput, userId, username);
+      updateState(content, normalizedInput, userId, username, false); // isBot: false
       await applySmartMoveReaction(message, true, "normal");
 
       await sendWebhook(

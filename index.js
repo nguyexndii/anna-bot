@@ -1,5 +1,9 @@
 // index.js
 require("dotenv").config();
+const dns = require("dns");
+if (dns && typeof dns.setDefaultResultOrder === "function") {
+  dns.setDefaultResultOrder("ipv4first");
+}
 const express = require("express");
 const { Client, GatewayIntentBits, Events } = require("discord.js");
 
@@ -205,11 +209,16 @@ client.once(Events.ClientReady, async () => {
   try {
     const chainChannel = await client.channels.fetch(WORDCHAIN_CHANNEL_ID).catch(() => null);
     if (chainChannel && chainChannel.isTextBased()) {
-      const { restored, state } = await restoreWordChainState(chainChannel);
+      const { restored, state, hasHumanReplied } = await restoreWordChainState(chainChannel);
       if (restored && state) {
         console.log(`🔤 Minigame Nối Từ: Đã khôi phục ván dở dang "${state.currentWord}" (chờ chữ "${state.expectedKey}") tại kênh <#${WORDCHAIN_CHANNEL_ID}>`);
-        // Khởi động lại bộ đếm tiếp chiêu nếu người chơi không ai nối
-        scheduleBotTurn(client, chainChannel, null, 180);
+        // CHỈ lên lịch tiếp chiêu NẾU lượt trước là của Người chơi và Người chơi đang chờ Bot
+        // TUYỆT ĐỐI không hẹn giờ nếu lượt trước đã là của Bot hoặc chưa có user nào rep (tránh bot tự lặp tin nhắn khi restart)
+        if (hasHumanReplied && !state.isBotTurn) {
+          scheduleBotTurn(client, chainChannel, null, 180);
+        } else {
+          console.log(`ℹ️ Minigame Nối Từ: Lượt gần nhất là của Trọng tài hoặc chưa có người chơi nào nối tiếp. Dừng chờ người chơi, không hẹn giờ tiếp chiêu.`);
+        }
       } else {
         const startState = startGame(client.user.id, client.user.username);
         await sendWebhook(
@@ -580,6 +589,7 @@ client.on(Events.MessageCreate, async (message) => {
             `**Đền bù bảo trì:** 600 Oroberyl gửi qua hòm thư.`,
         };
 
+        const chosen = sampleMap[gameArg] || sampleMap.genshin;
         const sampleSummary = sampleSummaries[chosen.game] || sampleSummaries.genshin;
 
         const updateData = {
@@ -602,8 +612,11 @@ client.on(Events.MessageCreate, async (message) => {
     }
 
     // 0. Ưu tiên số 1: Lệnh tra cứu danh sách lệnh (!lenh, !help, !command, !comment, !menu...)
-    // Hoạt động ở TOÀN BỘ CÁC KÊNH (kể cả kênh test nối từ, sắp xếp từ hay săn code)
-    if (isMasterHelpCommand(message.content)) {
+    // Ngoại lệ: Ở kênh Nối Từ hoặc Sắp Xếp Từ, lệnh !help/.help được nhường cho minigame hiển thị luật chơi
+    const isMinigameChannel = (message.channel.id === WORDCHAIN_CHANNEL_ID || message.channel.id === WORDSCRAMBLE_CHANNEL_ID);
+    const isBasicHelp = (lowerRaw === "!help" || lowerRaw === ".help");
+
+    if (isMasterHelpCommand(message.content) && !(isMinigameChannel && isBasicHelp)) {
       await onHelpMessage(client)(message);
       return;
     }
@@ -625,10 +638,8 @@ client.on(Events.MessageCreate, async (message) => {
     // Route 3: Săn Code Wuthering Waves (Các lệnh quản lý code của Admin)
     if (channelId === WUWA_CODES_CHANNEL_ID) {
       await onWuwaCodeMessage(client)(message);
+      return;
     }
-
-    // Route 4: Lệnh trợ giúp tổng hợp dự phòng
-    await onHelpMessage(client)(message);
   } catch (err) {
     console.error("❌ Error in messageCreate wrapper:", err);
   }

@@ -58,12 +58,12 @@ const { getGameEmoji } = require("../../utils/emojiHelper");
  */
 function applyGameThemeEmojis(client, gameKey, text) {
   let formatted = text
-    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Phiên bản & Thời gian/gi, `\n📅 **Phiên bản & Thời gian`)
-    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Banner Nhân vật(?: & Vũ khí mới)?/gi, `\n🎯 **Banner Nhân vật & Vũ khí mới`)
-    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Cốt truyện & (?:Bản đồ|Khu vực)(?:\/Khu vực)?(?: mới)?/gi, `\n🗺️ **Cốt truyện & Bản đồ/Khu vực mới`)
-    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Sự kiện nổi bật(?: & Quà tặng)?/gi, `\n🎁 **Sự kiện nổi bật & Quà tặng`)
-    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Cải tiến tính năng(?:\s*\(QoL nổi bật\))?/gi, `\n⚙️ **Cải tiến tính năng (QoL nổi bật)`)
-    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Đền bù bảo trì/gi, `\n✉️ **Đền bù bảo trì`);
+    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Phiên bản & Thời gian[^\n]*/gi, `\n### 📅 Phiên bản & Thời gian`)
+    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Banner Nhân vật(?: & Vũ khí mới)?[^\n]*/gi, `\n### 🎯 Banner Nhân vật & Vũ khí mới`)
+    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Cốt truyện & (?:Bản đồ|Khu vực)(?:\/Khu vực)?(?: mới)?[^\n]*/gi, `\n### 🗺️ Cốt truyện & Bản đồ / Khu vực mới`)
+    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Sự kiện nổi bật(?: & Quà tặng)?[^\n]*/gi, `\n### 🎁 Sự kiện nổi bật & Quà tặng`)
+    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Cải tiến tính năng(?:\s*\(QoL nổi bật\))?[^\n]*/gi, `\n### ⚙️ Cải tiến tính năng (QoL nổi bật)`)
+    .replace(/(?:^|\n)(?:•\s*)?(?:[^\w\s\n*]|<:[^>]+>)?\s*\*?\*?Đền bù bảo trì[^\n]*/gi, `\n### ✉️ Đền bù bảo trì`);
 
   // Thay thế tiền tệ theo đúng từng game riêng biệt, tuyệt đối không lộn xộn giữa các game
   if (gameKey === "genshin") {
@@ -82,22 +82,26 @@ function applyGameThemeEmojis(client, gameKey, text) {
 }
 
 /**
- * Xây dựng payload để tạo bài đăng trong kênh Forum
+ * Xây dựng payload để tạo bài đăng trong kênh Forum hoặc Kênh Thường
  */
 function buildForumPostPayload(client, updateData, summaryText) {
   const config = GAME_FORUM_CONFIG[updateData.game] || GAME_FORUM_CONFIG.genshin;
   const themedDesc = applyGameThemeEmojis(client, updateData.game, summaryText);
 
-  // Tạo tiêu đề Thread ngắn gọn (tối đa 95 ký tự)
+  // Tạo tiêu đề ngắn gọn
   let threadName = `${config.prefix} ${updateData.title}`.replace(/\s+/g, " ").trim();
   if (threadName.length > 95) {
     threadName = threadName.slice(0, 92) + "...";
   }
 
+  // 1 Embed duy nhất chuẩn Discord:
+  // - Tiêu đề ở trên cùng (kèm link)
+  // - Chữ chi tiết tràn đều 100% bề ngang ở giữa (không dùng thumbnail góc để tránh khoảng trống bên phải)
+  // - Ảnh banner lớn 1080p nằm ở dưới cùng bài viết
   const embed = new EmbedBuilder()
     .setTitle(updateData.title)
+    .setURL(updateData.postUrl || null)
     .setColor(config.color)
-    .setThumbnail(config.iconUrl)
     .setDescription(themedDesc)
     .setImage(updateData.bannerUrl)
     .setFooter({

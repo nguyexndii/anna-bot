@@ -65,6 +65,9 @@ function serializeGameState(state) {
     startedBy: state.startedBy,
     moveCount: state.moveCount || 0,
     sessionScores: Array.from((state.sessionScores || new Map()).entries()),
+    lastPlayerId: state.lastPlayerId || null,
+    lastPlayerName: state.lastPlayerName || null,
+    isBotTurn: Boolean(state.isBotTurn),
   };
 }
 
@@ -83,6 +86,9 @@ function deserializeGameState(data) {
     startedBy: data.startedBy,
     moveCount: data.moveCount || 0,
     sessionScores: new Map(data.sessionScores || []),
+    lastPlayerId: data.lastPlayerId || null,
+    lastPlayerName: data.lastPlayerName || null,
+    isBotTurn: Boolean(data.isBotTurn),
   };
 }
 
@@ -159,6 +165,7 @@ async function restoreWordChainState(chainChannel = null) {
     }
 
     // 3. Cross-check with recent messages in chainChannel to ensure round isn't already finished
+    let hasHumanReplied = false;
     if (chainChannel && chainChannel.isTextBased()) {
       try {
         const messages = await chainChannel.messages.fetch({ limit: 10 }).catch(() => null);
@@ -172,7 +179,21 @@ async function restoreWordChainState(chainChannel = null) {
             lastMsg.embeds.some((e) => e.title && e.title.includes("CHIẾN THẮNG"));
           if (hasWinEmbed) {
             console.log("ℹ️ Ván trước đã có người chiến thắng, sẽ bắt đầu ván mới.");
-            return { restored: false, state: null };
+            return { restored: false, state: null, hasHumanReplied: false };
+          }
+
+          // Kiểm tra xem tin nhắn mới nhất trong kênh có phải là do Bot/Webhook gửi không
+          const isBotOrWebhook = lastMsg.author.bot || Boolean(lastMsg.webhookId);
+          const isBotContent = lastMsg.content && (
+            lastMsg.content.includes("Trọng tài đã tiếp chiêu") ||
+            lastMsg.content.includes("MINIGAME NỐI TỪ ĐÃ SẴN SÀNG") ||
+            lastMsg.content.includes("Từ mở màn")
+          );
+
+          if (!isBotOrWebhook && !isBotContent) {
+            hasHumanReplied = true;
+          } else {
+            hasHumanReplied = false;
           }
         }
       } catch (chanErr) {
@@ -182,13 +203,17 @@ async function restoreWordChainState(chainChannel = null) {
 
     if (savedData && savedData.currentWord) {
       gameState = deserializeGameState(savedData);
+      // Nếu tin nhắn mới nhất trong kênh là của Bot/Webhook thì gán isBotTurn = true
+      if (!hasHumanReplied) {
+        gameState.isBotTurn = true;
+      }
       console.log(
-        `🔄 Khôi phục ván Nối Từ dở dang thành công! Từ hiện tại: "${gameState.currentWord}" (Chữ tiếp theo: "${gameState.expectedKey}"), lượt đã đi: ${gameState.moveCount}`
+        `🔄 Khôi phục ván Nối Từ dở dang thành công! Từ hiện tại: "${gameState.currentWord}" (Chữ tiếp theo: "${gameState.expectedKey}"), lượt đã đi: ${gameState.moveCount}, isBotTurn: ${gameState.isBotTurn}`
       );
-      return { restored: true, state: gameState };
+      return { restored: true, state: gameState, hasHumanReplied };
     }
 
-    return { restored: false, state: null };
+    return { restored: false, state: null, hasHumanReplied: false };
   } catch (err) {
     console.error("❌ Lỗi khi khôi phục ván Nối Từ:", err.message);
     return { restored: false, state: null };
@@ -215,6 +240,9 @@ function startGame(userId, username = "Bot") {
     startedBy: userId,
     moveCount: 0,
     sessionScores: new Map(), // Scores for current game session only
+    lastPlayerId: userId,
+    lastPlayerName: username,
+    isBotTurn: true, // Từ mở màn do Bot/Hệ thống khởi tạo, chờ người chơi nối tiếp
   };
 
   console.log(`🎮 Game started by ${username} (${userId}). Initial phrase: "${startPhrase}"`);
@@ -254,8 +282,15 @@ function checkDuplicate(normalizedWord) {
  * @returns {boolean}
  */
 function checkReversal(normalizedWord) {
-  if (!gameState || !gameState.recentPairs) return false;
-  return gameState.recentPairs.includes(normalizedWord);
+  if (!gameState) return false;
+  const words = normalizedWord.trim().split(/\s+/);
+  if (words.length !== 2) return false;
+
+  const reversed = `${words[1]} ${words[0]}`;
+  return (
+    gameState.normalizedWord === reversed ||
+    (Array.isArray(gameState.recentPairs) && gameState.recentPairs.includes(reversed))
+  );
 }
 
 /**
@@ -264,8 +299,9 @@ function checkReversal(normalizedWord) {
  * @param {string} normalizedWord - Normalized text (e.g., "du doan")
  * @param {string} userId - Player's Discord ID
  * @param {string} username - Player's username
+ * @param {boolean} isBot - Whether this move is made by the Bot/Referee
  */
-function updateState(originalWord, normalizedWord, userId, username) {
+function updateState(originalWord, normalizedWord, userId, username, isBot = false) {
   if (!gameState) {
     return { sessionScore: 0, currentWord: originalWord, expectedKey: "", moveCount: 0 };
   }
@@ -275,6 +311,9 @@ function updateState(originalWord, normalizedWord, userId, username) {
   gameState.expectedKey = lastKey(originalWord);
   gameState.usedWords.add(normalizedWord);
   gameState.moveCount++;
+  gameState.lastPlayerId = userId;
+  gameState.lastPlayerName = username;
+  gameState.isBotTurn = Boolean(isBot || username === "Hệ Thống Trọng Tài");
 
   if (!gameState.recentPairs) {
     gameState.recentPairs = [];

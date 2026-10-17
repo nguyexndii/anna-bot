@@ -20,6 +20,7 @@ const isAdmin = (userId) => (ADMIN_IDS && ADMIN_IDS.length > 0) ? ADMIN_IDS.incl
 
 // Track processed guess messages
 const processingScramble = new Set();
+let isRoundTransitioning = false;
 
 // Hint cooldown map: Map<userId, timestamp>
 const scrambleHintCooldowns = new Map();
@@ -46,6 +47,7 @@ function onWordScrambleMessage(client) {
 
     // Lệnh !sapxep / !daotu: Bắt đầu ván chơi Sắp xếp từ mới
     if (rawContent === "!sapxep" || rawContent === "!daotu" || rawContent === "!đảo từ") {
+      isRoundTransitioning = false;
       await message.channel.sendTyping();
       const round = await startScrambleRound();
       const embed = createScrambleChallengeEmbed(round.scrambledText);
@@ -73,6 +75,7 @@ function onWordScrambleMessage(client) {
         await message.reply("⛔ Chỉ Quản trị viên (Admin) mới có quyền bỏ qua câu đố!").catch(() => {});
         return;
       }
+      isRoundTransitioning = false;
       if (!state.active || !state.originalWord) {
         await message.reply("✨ Hiện không có ván chơi nào đang diễn ra!").catch(() => {});
         return;
@@ -146,7 +149,7 @@ function onWordScrambleMessage(client) {
     // ====================================================
     // XỬ LÝ ĐOÁN TỪ CỦA NGƯỜI CHƠI
     // ====================================================
-    if (!state.active || !state.originalWord) return;
+    if (!state.active || !state.originalWord || isRoundTransitioning) return;
 
     // Check if the message looks like a candidate guess (e.g. 2 words hoặc chiều dài tương đương)
     // để tránh thả reaction sai vào các tin nhắn chat bình thường
@@ -165,29 +168,37 @@ function onWordScrambleMessage(client) {
 
     try {
       const isCorrect = await checkGuessAsync(rawContent);
+      if (!state.active || isRoundTransitioning) return;
 
       if (isCorrect) {
-        // Player solved the puzzle!
-        const totalWins = recordScrambleWin(message.author.id, message.author.username);
+        isRoundTransitioning = true;
+        state.active = false;
 
-        // React với icon đúng + icon ăn mừng
-        await applySmartMoveReaction(message, true, "scramble_win");
+        try {
+          // Player solved the puzzle!
+          const totalWins = recordScrambleWin(message.author.id, message.author.username);
 
-        // Win notification line sent via wordscramble webhook or channel
-        const solvedWordDisplay = rawContent !== state.originalWord ? `${rawContent} (${state.originalWord})` : state.originalWord;
-        await sendWebhook(
-          webhookUrl || "wordscramble",
-          {
-            content: `🎉 <@${message.author.id}> đã xuất sắc giải đáp chính xác cụm từ **"${solvedWordDisplay}"**! *(+1 điểm ➔ Tổng: **${totalWins}** lần thắng)*`,
-          },
-          message.channel
-        );
+          // React với icon đúng + icon ăn mừng
+          await applySmartMoveReaction(message, true, "scramble_win");
 
-        // Start next round automatically directly in Word Scramble channel
-        await message.channel.sendTyping();
-        const nextRound = await startScrambleRound();
-        const nextEmbed = createScrambleChallengeEmbed(nextRound.scrambledText);
-        await sendWebhook(webhookUrl || "wordscramble", { embeds: [nextEmbed] }, message.channel);
+          // Win notification line sent via wordscramble webhook or channel
+          const solvedWordDisplay = rawContent !== state.originalWord ? `${rawContent} (${state.originalWord})` : state.originalWord;
+          await sendWebhook(
+            webhookUrl || "wordscramble",
+            {
+              content: `🎉 <@${message.author.id}> đã xuất sắc giải đáp chính xác cụm từ **"${solvedWordDisplay}"**! *(+1 điểm ➔ Tổng: **${totalWins}** lần thắng)*`,
+            },
+            message.channel
+          );
+
+          // Start next round automatically directly in Word Scramble channel
+          await message.channel.sendTyping();
+          const nextRound = await startScrambleRound();
+          const nextEmbed = createScrambleChallengeEmbed(nextRound.scrambledText);
+          await sendWebhook(webhookUrl || "wordscramble", { embeds: [nextEmbed] }, message.channel);
+        } finally {
+          isRoundTransitioning = false;
+        }
       } else {
         // Đoán SAI: Thả reaction SAI + 1 reaction cà khịa/hài hước
         await applySmartMoveReaction(message, false, "scramble_wrong");

@@ -101,4 +101,11 @@ module.exports = {
     WORDSCRAMBLE: process.env.WEBHOOK_WORDSCRAMBLE,
     WUWA_CODES: process.env.WEBHOOK_WUWA_CODES,
   },
+
+  // Đồng bộ Channels & Roles cho các module phụ (imageFilter, aiChat, autoRemoveTempRole)
+  GENERAL_CHAT_CHANNEL_ID: process.env.GENERAL_CHAT_CHANNEL_ID || CHANNELS.GENERAL_CHAT,
+  IMAGE_UPLOAD_CHANNEL_ID: process.env.IMAGE_UPLOAD_CHANNEL_ID || CHANNELS.IMAGE_UPLOAD,
+  AI_CHANNELS: CHANNELS.AI_CHAT,
+  TEMP_ROLE_ID: process.env.TEMP_ROLE_ID || ROLES.TEMP_ROLE,
+  PERMANENT_ROLE_ID: process.env.PERMANENT_ROLE_ID || ROLES.PERMANENT_ROLE,
 };

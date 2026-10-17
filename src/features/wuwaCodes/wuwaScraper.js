@@ -1,6 +1,63 @@
 // src/features/wuwaCodes/wuwaScraper.js
+const http = require("http");
+const https = require("https");
 const axios = require("axios");
 const cheerio = require("cheerio");
+
+const ipv4HttpsAgent = new https.Agent({
+  keepAlive: true,
+  family: 4,
+  timeout: 15000,
+});
+
+const ipv4HttpAgent = new http.Agent({
+  keepAlive: true,
+  family: 4,
+  timeout: 15000,
+});
+
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+  "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+  "Cache-Control": "max-age=0",
+  "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
+
+/**
+ * Gọi HTTP với cơ chế retry và ép buộc IPv4
+ */
+async function fetchWithIpv4Retry(url, options = {}, retries = 2, delayMs = 1500) {
+  let lastErr = null;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.get(url, {
+        httpAgent: ipv4HttpAgent,
+        httpsAgent: ipv4HttpsAgent,
+        timeout: 15000,
+        ...options,
+        headers: {
+          ...BROWSER_HEADERS,
+          ...(options.headers || {}),
+        },
+      });
+      return response;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 const FANDOM_API_URL = "https://wutheringwaves.fandom.com/api.php?action=parse&page=Redemption_Code&format=json";
 const REDDIT_BACKUP_URL = "https://www.reddit.com/r/wutheringwavescodes/new.json?limit=20";
@@ -120,14 +177,10 @@ let lastWwplusAlertTs = 0;
  */
 async function discoverWwplusCodeUrl() {
   try {
-    const res = await axios.get("https://wwplus.net/", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      timeout: 8000,
+    const res = await fetchWithIpv4Retry("https://wwplus.net/", {
+      headers: { Referer: "https://www.google.com/" },
     });
-    if (!res.data) return null;
+    if (!res || !res.data) return null;
     const $ = cheerio.load(res.data);
     let foundUrl = null;
 
@@ -160,10 +213,11 @@ async function notifyAdminScraperFailure(client, errorDetail) {
 
   await sendAdminDM(client, ADMIN_ID, {
     title: "⚠️ CẢNH BÁO: NGUỒN CÀO CODE WWPLUS BỊ LỖI",
-    description: "Bot không thể lấy dữ liệu Giftcode từ **WWPlus.net**. Website có thể đã đổi URL hoặc thay đổi cấu trúc bảng.\n\n" +
+    description: "Bot không thể lấy dữ liệu Giftcode từ **WWPlus.net**. Website có thể đã đổi URL hoặc bị Cloudflare chặn IP máy chủ.\n\n" +
       `📌 **Chi tiết lỗi:** \`${errorDetail}\`\n` +
       `🔗 **URL đang cào:** ${currentWwplusUrl}\n` +
-      "💡 **Hành động:** Bạn vui lòng vào kiểm tra lại `wwplus.net` xem đường dẫn bài viết code mới để cập nhật nhé.",
+      "ℹ️ **Trạng thái:** Bot vẫn tự động thu thập Giftcode từ **Fandom Wiki** và **Reddit**, người dùng không bị lỡ code.\n" +
+      "💡 **Hành động:** Bạn có thể vào kiểm tra lại `wwplus.net` xem đường dẫn bài viết code mới hoặc cập nhật nếu cần.",
     color: "#FFA500",
   });
 }
@@ -172,15 +226,11 @@ async function notifyAdminScraperFailure(client, errorDetail) {
  * Bóc tách code từ một URL cụ thể của WWPlus
  */
 async function scrapeWwplusFromUrl(targetUrl) {
-  const response = await axios.get(targetUrl, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-    timeout: 10000,
+  const response = await fetchWithIpv4Retry(targetUrl, {
+    headers: { Referer: "https://wwplus.net/" },
   });
 
-  if (!response.data) return [];
+  if (!response || !response.data) return [];
   const $ = cheerio.load(response.data);
   const codesList = [];
 

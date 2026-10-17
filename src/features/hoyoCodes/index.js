@@ -3,6 +3,7 @@ const { scrapeAllHoyoCodes } = require("./hoyoScraper");
 const { createHoyoCodeMessage } = require("./embedBuilder");
 const HoyoCodeModel = require("../../database/models/HoyoCode");
 const { HOYO_CODES_CHANNEL_ID, HOYO_ROLE_ID } = require("../../config/env");
+const { recordSuccess, recordError } = require("../../utils/healthTracker");
 
 // Set ghi nhớ các code đã biết trong RAM
 const knownHoyoCodesSet = new Set();
@@ -151,6 +152,7 @@ async function checkAndNotifyHoyoCodes(client) {
       }
     }
 
+    recordSuccess("code_hoyo");
     return {
       success: true,
       totalScraped: liveCodesList.length,
@@ -161,6 +163,7 @@ async function checkAndNotifyHoyoCodes(client) {
     };
   } catch (err) {
     console.error("❌ [Hoyo Code Watcher] Lỗi trong chu kỳ kiểm tra code:", err);
+    recordError("code_hoyo", err.message);
     return {
       success: false,
       message: `Đã xảy ra lỗi khi kết nối hoặc xử lý: ${err.message}`,
@@ -172,12 +175,13 @@ async function checkAndNotifyHoyoCodes(client) {
  * Khởi tạo bộ theo dõi Code HoYoverse tự động
  * @param {import("discord.js").Client} client
  */
-function initHoyoCodeWatcher(client) {
+async function initHoyoCodeWatcher(client) {
   const targetChannelId = HOYO_CODES_CHANNEL_ID || "1528768068581457930";
   console.log(`🚀 [Hoyo Code Watcher] Đã kích hoạt theo dõi Code Genshin, HSR & ZZZ cho kênh chính thức (${targetChannelId})!`);
 
-  // 1. Nạp danh sách code đã biết từ MongoDB Atlas
-  HoyoCodeModel.find({}).then(async (docs) => {
+  try {
+    // 1. Nạp danh sách code đã biết từ MongoDB Atlas
+    const docs = await HoyoCodeModel.find({}).catch(() => []);
     if (docs && docs.length > 0) {
       for (const doc of docs) {
         knownHoyoCodesSet.add(`${doc.game}_${doc.code}`);
@@ -187,41 +191,36 @@ function initHoyoCodeWatcher(client) {
 
     // 2. Chốt toàn bộ code hiện tại trên web làm mốc cũ (Baseline)
     // Tuyệt đối không gửi spam những code đã phát hành trước thời điểm kích hoạt hôm nay
-    try {
-      const allScraped = await scrapeAllHoyoCodes();
-      const allCurrent = [...allScraped.genshin, ...allScraped.hsr, ...allScraped.zzz];
-      for (const c of allCurrent) {
-        knownHoyoCodesSet.add(`${c.game}_${c.code}`);
-        await HoyoCodeModel.findOneAndUpdate(
-          { game: c.game, code: c.code },
-          {
-            game: c.game,
-            code: c.code,
-            server: c.server || "Tất cả",
-            rewardsText: c.rewardsText || "• Chưa có thông tin phần thưởng",
-            duration: c.duration || "Còn hiệu lực",
-            redeemUrl: c.redeemUrl || "",
-            isActive: true,
-            notified: true,
-          },
-          { upsert: true }
-        ).catch(() => {});
-      }
-      console.log(`🔒 [Hoyo Code Watcher] Đã khóa mốc ban đầu (${knownHoyoCodesSet.size} code cũ sẽ không bị gửi lại).`);
-    } catch (baselineErr) {
-      console.error("⚠️ Lỗi chốt baseline code cũ:", baselineErr.message);
+    const allScraped = await scrapeAllHoyoCodes().catch(() => ({ genshin: [], hsr: [], zzz: [] }));
+    const allCurrent = [...(allScraped.genshin || []), ...(allScraped.hsr || []), ...(allScraped.zzz || [])];
+    for (const c of allCurrent) {
+      knownHoyoCodesSet.add(`${c.game}_${c.code}`);
+      await HoyoCodeModel.findOneAndUpdate(
+        { game: c.game, code: c.code },
+        {
+          game: c.game,
+          code: c.code,
+          server: c.server || "Tất cả",
+          rewardsText: c.rewardsText || "• Chưa có thông tin phần thưởng",
+          duration: c.duration || "Còn hiệu lực",
+          redeemUrl: c.redeemUrl || "",
+          isActive: true,
+          notified: true,
+        },
+        { upsert: true }
+      ).catch(() => {});
     }
-  }).catch(() => {});
+    console.log(`🔒 [Hoyo Code Watcher] Đã khóa mốc ban đầu (${knownHoyoCodesSet.size} code cũ sẽ không bị gửi lại).`);
+    recordSuccess("code_hoyo");
+  } catch (baselineErr) {
+    console.error("⚠️ [Hoyo Code Watcher] Lỗi chốt baseline code cũ:", baselineErr.message);
+    recordError("code_hoyo", baselineErr.message);
+  }
 
-  // Chạy lần đầu sau 8 giây khi bot khởi động
-  setTimeout(() => {
-    checkAndNotifyHoyoCodes(client);
-  }, 8000);
-
-  // Định kỳ chạy mỗi 30 phút (1,800,000 ms)
+  // Định kỳ chạy mỗi 10 phút (600,000 ms)
   setInterval(() => {
     checkAndNotifyHoyoCodes(client);
-  }, 30 * 60 * 1000);
+  }, 10 * 60 * 1000);
 }
 
 module.exports = {
