@@ -1,7 +1,8 @@
 // scripts/dispatch_all_gacha_updates.js
 const { Client, GatewayIntentBits, MessageFlags } = require("discord.js");
 const mongoose = require("mongoose");
-require("dotenv").config({ path: "d:/discord-bot/anna/anna-bot/.env" });
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 const { buildForumPostPayload } = require("../src/features/gachaUpdates/embedBuilder");
 const GachaForumPost = require("../src/database/models/GachaForumPost");

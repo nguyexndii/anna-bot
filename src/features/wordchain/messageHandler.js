@@ -11,7 +11,7 @@ const {
   startGame,
   skipGame,
 } = require("./game.service");
-const { canConnectWithAI, hasNextWords, getNextWords } = require("./wordPairs.service");
+const { canConnect, canConnectWithAI, hasNextWords, getNextWords } = require("./wordPairs.service");
 const { getAIHint } = require("./aiValidator.service");
 const { isValidFormat, normalize } = require("../../utils/textUtils");
 const {
@@ -32,6 +32,10 @@ const processingMessages = new Set();
 // Hint command cooldown map: Map<userId, timestamp>
 const hintCooldowns = new Map();
 const HINT_COOLDOWN_MS = 120000; // 2 phút
+
+// AI verification cooldown per user: Map<userId, timestamp> (Chống spam đốt quota Gemini)
+const aiCheckCooldowns = new Map();
+const AI_CHECK_COOLDOWN_MS = 2500; // 2.5 giây Cooldown gọi AI thẩm định từ lạ
 
 // Bot Auto-turn timer (3 phút = 180 giây)
 const AUTO_PLAY_TIMEOUT_SEC = 180;
@@ -307,8 +311,25 @@ function onWordChainMessage(client) {
         return;
       }
 
-      // 4. Validate connection (Chế từ / không có trong từ điển -> who_tf, Hề, Cười nhạo)
-      const connectResult = await canConnectWithAI(firstWord, secondWord);
+      // 4. Validate connection (Ưu tiên từ điển tĩnh wordPairs.json 0ms, AI fallback có rate limit 2.5s per user)
+      let connectResult = null;
+      if (canConnect(firstWord, secondWord)) {
+        connectResult = { connect: true, source: "dictionary" };
+      } else {
+        // Kiểm soát tốc độ gọi AI theo từng người chơi (chống spam đốt quota)
+        const now = Date.now();
+        const lastAiCheck = aiCheckCooldowns.get(userId) || 0;
+        if (now - lastAiCheck < AI_CHECK_COOLDOWN_MS) {
+          // Người chơi gõ từ lạ quá nhanh (< 2.5s), bỏ qua gọi AI và thả reaction sai
+          await applySmartMoveReaction(message, false, "invalid");
+          return;
+        }
+        if (aiCheckCooldowns.size > 2000) aiCheckCooldowns.clear();
+        aiCheckCooldowns.set(userId, now);
+
+        connectResult = await canConnectWithAI(firstWord, secondWord);
+      }
+
       if (!connectResult || !connectResult.connect) {
         await applySmartMoveReaction(message, false, "not_in_dict");
         return;

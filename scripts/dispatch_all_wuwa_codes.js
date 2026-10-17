@@ -1,7 +1,8 @@
 // scripts/dispatch_all_wuwa_codes.js
 const { Client, GatewayIntentBits } = require("discord.js");
 const mongoose = require("mongoose");
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 const { scrapeWuwaCodes } = require("../src/features/wuwaCodes/wuwaScraper");
 const { createWuwaCodeEmbed } = require("../src/features/wuwaCodes/embedBuilder");

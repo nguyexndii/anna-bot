@@ -47,6 +47,9 @@ function saveScrambleScores(scoresMap) {
 // Track used words to prevent repetition in playing sessions (up to 500 words)
 const usedScrambleWords = new Set();
 
+// In-memory verification cache for anagram AI validations: Map<cacheKey, boolean>
+const scrambleVerificationCache = new Map();
+
 // Game State for Word Scramble
 let scrambleState = {
   active: false,
@@ -383,7 +386,17 @@ async function checkGuessAsync(guessText) {
   const origLetters = normalizedOriginal.replace(/\s+/g, "").split("").sort().join("");
 
   if (guessLetters === origLetters) {
-    // 3. Ask AI if this alternative combination (e.g. "thương yêu" vs "yêu thương") is a valid meaningful phrase
+    // 3. Chống Prompt Injection & lọc sạch ký tự đặc biệt/điều khiển
+    if (/[{}<>"\\\/$;`~^+=*\n\r]/.test(guessText) || guessText.length > 25) {
+      return false;
+    }
+
+    const cacheKey = `${scrambleState.originalWord}:${normalizedGuess}`;
+    if (scrambleVerificationCache.has(cacheKey)) {
+      return scrambleVerificationCache.get(cacheKey);
+    }
+
+    // 4. Ask AI if this alternative combination (e.g. "thương yêu" vs "yêu thương") is a valid meaningful phrase
     const prompt = `Bạn là chuyên gia ngôn ngữ Tiếng Việt.
 Hãy kiểm tra xem cụm từ "${guessText}" có phải là 1 cụm từ tiếng Việt 2 tiếng có nghĩa, đúng ngữ pháp và hợp lý không.
 
@@ -400,11 +413,17 @@ Bắt buộc trả về đúng định dạng JSON:
         const parsed = JSON.parse(cleanText);
         if (parsed.isValid === true) {
           console.log(`✨ AI validated flexible scramble guess: "${guessText}" is valid for original "${scrambleState.originalWord}"`);
+          if (scrambleVerificationCache.size > 1000) scrambleVerificationCache.clear();
+          scrambleVerificationCache.set(cacheKey, true);
           return true;
         }
       }
+      if (scrambleVerificationCache.size > 1000) scrambleVerificationCache.clear();
+      scrambleVerificationCache.set(cacheKey, false);
     } catch (err) {
       console.error("❌ Lỗi AI kiểm tra từ đảo Sắp Xếp:", err.message);
+      if (scrambleVerificationCache.size > 1000) scrambleVerificationCache.clear();
+      scrambleVerificationCache.set(cacheKey, false);
     }
   }
 

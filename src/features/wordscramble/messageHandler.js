@@ -21,9 +21,11 @@ const isAdmin = (userId) => (ADMIN_IDS && ADMIN_IDS.length > 0) ? ADMIN_IDS.incl
 const processingScramble = new Set();
 let isRoundTransitioning = false;
 
-// Hint cooldown map: Map<userId, timestamp>
+// Cooldown maps: Map<userId, timestamp>
 const scrambleHintCooldowns = new Map();
 const SCRAMBLE_HINT_COOLDOWN_MS = 60000; // 60 giây Cooldown chống spam
+const scrambleStartCooldowns = new Map();
+const SCRAMBLE_START_COOLDOWN_MS = 15000; // 15 giây Cooldown chống spam gọi ván mới
 
 /**
  * Handle messages for Word Scramble Game
@@ -42,6 +44,22 @@ function onWordScrambleMessage(client) {
 
     // Lệnh !sapxep / !daotu: Bắt đầu ván chơi Sắp xếp từ mới
     if (rawContent === "!sapxep" || rawContent === "!daotu" || rawContent === "!đảo từ") {
+      // 1. Chống phá ván / đốt quota: Nếu ván đang diễn ra, người thường không được quyền hủy ván
+      if (state.active && state.originalWord && !isAdmin(message.author.id)) {
+        await message.reply("🧩 Hiện đang có câu đố chưa được giải! Hãy giải câu đố hiện tại hoặc dùng `!goiy` nhé (Chỉ Admin mới có thể dùng `!skip` để đổi câu).").catch(() => {});
+        return;
+      }
+
+      // 2. Chống spam gọi Gemini AI: Cooldown 15 giây mỗi người chơi
+      const now = Date.now();
+      const lastStartTime = scrambleStartCooldowns.get(message.author.id) || 0;
+      if (now - lastStartTime < SCRAMBLE_START_COOLDOWN_MS) {
+        const remainingSec = Math.ceil((SCRAMBLE_START_COOLDOWN_MS - (now - lastStartTime)) / 1000);
+        await message.reply(`⏳ Bạn thao tác quá nhanh! Vui lòng chờ **${remainingSec}s** nữa để bắt đầu ván mới.`).catch(() => {});
+        return;
+      }
+      scrambleStartCooldowns.set(message.author.id, now);
+
       isRoundTransitioning = false;
       await message.channel.sendTyping();
       const round = await startScrambleRound();

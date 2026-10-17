@@ -37,7 +37,7 @@ module.exports = {
   // ID các Vai trò/Chức vụ (Roles)
   ROLES: {
     WUWA_ROLE: process.env.WUWA_ROLE_ID || "1528768731873017896", // Role WuWa (🍚Diện Nhận Trợ Cấp)
-    HOYO_ROLE: process.env.HOYO_ROLE_ID || "1454449657588748401", // Role Hoyo (Hoyo Buddy)
+    HOYO_ROLE: process.env.HOYO_ROLE_ID || "1528768731873017896", // Role Hoyo (🍚Diện Nhận Trợ Cấp)
     ENDFIELD_ROLE: process.env.ENDFIELD_ROLE_ID || "1528768731873017896", // Role Endfield (🍚Diện Nhận Trợ Cấp)
   },
 };

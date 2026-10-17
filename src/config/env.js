@@ -3,7 +3,7 @@ const { ADMIN_IDS: DEFAULT_ADMIN_IDS, CHANNELS, ROLES, EMOJIS, MUSIC_BOT_ID: DEF
 
 const STAFF_CHANNEL = process.env.STAFF_CHANNEL_ID || "1447095306079698984";
 
-const ADMIN_IDS = (process.env.ADMIN_IDS || process.env.OWNER_DISCORD_ID || "875358286487097395,1028387082987114516")
+const ADMIN_IDS = (process.env.ADMIN_IDS || process.env.OWNER_DISCORD_ID || "875358286487097395")
   .split(",")
   .map((id) => id.trim())
   .filter(Boolean);
@@ -23,7 +23,7 @@ const PROD_CHANNELS = {
   HOYO_CODES: "1528768068581457930",     // Kênh Săn Code HoYoverse chính thức
   ENDFIELD_CODES: "1528768068581457930", // Kênh Săn Code Endfield chính thức
   RULES: "1450073214620405903",          // Kênh Luật chơi chính
-  GACHA_UPDATES: "1559744328899887195",  // Kênh Bảng Tin Cập Nhật Gacha chính thức
+  GACHA_UPDATES: "1559612707605319710",  // Kênh Bảng Tin Cập Nhật Gacha chính thức (Forum)
 };
 
 const TEST_CHANNELS = {
@@ -33,6 +33,7 @@ const TEST_CHANNELS = {
   HOYO_CODES: "1547084091868844142",     // Kênh Săn Code HoYoverse test demo
   ENDFIELD_CODES: "1547084091868844142", // Kênh Săn Code Endfield test demo
   RULES: "1547083697688285255",          // Kênh Luật chơi khi test
+  GACHA_UPDATES: "1559744328899887195",  // Kênh Bảng Tin Cập Nhật Gacha khi test
 };
 
 // Chế độ TEST (Mặc định false để chạy kênh chính khi deploy Render; chỉ bật true khi cần test)
@@ -81,8 +82,8 @@ module.exports = {
     .map((id) => id.trim())
     .filter(Boolean),
 
-  // Kênh Bảng Tin Cập Nhật Gacha Games (Đa Game - Kênh Chat Thường / Kênh Thông Báo)
-  GACHA_UPDATE_FORUM_CHANNEL_ID: process.env.GACHA_UPDATE_CHANNEL_ID || process.env.GACHA_UPDATE_FORUM_CHANNEL_ID || "1559744328899887195",
+  // Kênh Bảng Tin Cập Nhật Gacha Games (Đa Game - Kênh Forum chính thức / Kênh Test)
+  GACHA_UPDATE_FORUM_CHANNEL_ID: process.env.GACHA_UPDATE_CHANNEL_ID || process.env.GACHA_UPDATE_FORUM_CHANNEL_ID || (IS_TEST_MODE ? TEST_CHANNELS.GACHA_UPDATES : PROD_CHANNELS.GACHA_UPDATES),
 
   // Kênh Báo Lỗi & Cảnh Báo Hệ Thống (a_log-error / bot-health-error)
   ERROR_LOG_CHANNEL_ID: process.env.ERROR_LOG_CHANNEL_ID || (CHANNELS && CHANNELS.ERROR_LOG) || "1547449482835394640",

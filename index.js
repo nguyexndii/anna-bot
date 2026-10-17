@@ -328,12 +328,19 @@ client.on(Events.GuildCreate, async (guild) => {
 
 // Interaction Event Handler (Hỗ trợ nút bấm Sao chép nhanh mã code Wuthering Waves)
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (interaction.isButton() && interaction.customId.startsWith("copy_wuwa_")) {
-    const code = interaction.customId.replace("copy_wuwa_", "");
-    return interaction.reply({
-      content: `📋 **Mã quà tặng Wuthering Waves:**\n\`${code}\`\n\n💡 *Bấm vào mã trên để sao chép nhanh, sau đó mở game vào **Cài đặt ➔ Cài đặt khác ➔ Mã đổi quà** để nhận nhé!*`,
-      flags: 64, // Ephemeral: Chỉ người bấm mới thấy
-    });
+  try {
+    if (interaction.isButton() && interaction.customId.startsWith("copy_wuwa_")) {
+      const code = interaction.customId.replace("copy_wuwa_", "");
+      const safeCode = code.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30);
+      if (!interaction.replied && !interaction.deferred) {
+        return await interaction.reply({
+          content: `📋 **Mã quà tặng Wuthering Waves:**\n\`${safeCode}\`\n\n💡 *Bấm vào mã trên để sao chép nhanh, sau đó mở game vào **Cài đặt ➔ Cài đặt khác ➔ Mã đổi quà** để nhận nhé!*`,
+          flags: 64, // Ephemeral: Chỉ người bấm mới thấy
+        });
+      }
+    }
+  } catch (err) {
+    console.error("❌ Lỗi khi xử lý Button Interaction:", err.message);
   }
 });
 

@@ -7,8 +7,7 @@ node_modules/
 !.env.example
 vps_*.json
 
-# Operational & Dispatch Functional Scripts (Các script chức năng vận hành / dispatch)
-scripts/
+# Scratch Scripts
 *.scratch.js
 scratch/
 
