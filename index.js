@@ -308,6 +308,14 @@ client.once(Events.ClientReady, async () => {
   } catch (emojiErr) {
     console.warn("⚠️ Không thể tải trước Application Emojis:", emojiErr.message);
   }
+
+  // Initialize Kaomoji Custom Status Rotator (Tự động xoay tua trạng thái mỗi 60s)
+  try {
+    const { initStatusRotator } = require("./src/features/statusRotator");
+    initStatusRotator(client);
+  } catch (err) {
+    console.error("❌ Lỗi khởi tạo Status Rotator:", err.message);
+  }
 });
 
 // Auto-leave if added to an unauthorized guild
@@ -393,6 +401,16 @@ client.on(Events.MessageCreate, async (message) => {
       if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
         await evaluateVoiceRoom(message.guild, "admin_manual_trigger");
         return message.channel.send("🔄 **[Voice Keeper]** Đã kích hoạt tái đánh giá phòng voice ngay lập tức. Gõ `!checkvoice` để xem trạng thái mới!");
+      }
+    }
+
+    // 0.09 Lệnh Quản trị đổi trạng thái Kaomoji (!nextstatus, !doistatus, !kaomoji)
+    if (lowerRaw === "!nextstatus" || lowerRaw === "!doistatus" || lowerRaw === "!kaomoji" || lowerRaw === "!anextstatus") {
+      const { ADMIN_IDS, ADMIN_ID } = require("./src/config/env");
+      if (ADMIN_IDS.includes(message.author.id) || message.author.id === ADMIN_ID || message.member?.permissions?.has("Administrator")) {
+        const { updateStatus } = require("./src/features/statusRotator");
+        const newStatus = updateStatus(client);
+        return message.channel.send(`🎭 **[Status Rotator]** Đã đổi trạng thái bot sang: \`${newStatus}\``);
       }
     }
 
